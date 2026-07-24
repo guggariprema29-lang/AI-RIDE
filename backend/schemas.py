@@ -30,7 +30,7 @@ class UserResponse(UserCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RoutePoint(BaseModel):
@@ -58,7 +58,7 @@ class RouteResponse(RouteCreate):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class MatchRequest(BaseModel):
@@ -133,6 +133,76 @@ class EscrowRefundRequest(BaseModel):
 class UserVerifyRequest(BaseModel):
     user_id: int
     government_id: str
+
+
+class RidePublishRequest(BaseModel):
+    rider_id: int
+    origin: str
+    destination: str
+    origin_lat: float
+    origin_lng: float
+    dest_lat: float
+    dest_lng: float
+    current_lat: Optional[float] = None
+    current_lng: Optional[float] = None
+    polyline: List[RoutePoint] = Field(default_factory=list)
+    vehicle_type: str = "car"
+    vehicle_number: Optional[str] = None
+    seats_total: int = 1
+    fare_per_km: Optional[float] = None
+    departure_time: datetime
+    notes: Optional[str] = None
+
+
+class RideLocationUpdate(BaseModel):
+    latitude: float
+    longitude: float
+
+
+class RideStatusUpdate(BaseModel):
+    status: str  # available | started | completed | cancelled
+
+
+class RideSearchRequest(BaseModel):
+    passenger_id: Optional[int] = None
+    pickup: str
+    dropoff: str
+    pickup_lat: float
+    pickup_lng: float
+    drop_lat: float
+    drop_lng: float
+    seats: int = 1
+    max_detour_m: float = 2000.0
+    min_overlap: float = 0.45
+
+
+class BookingCreate(BaseModel):
+    ride_id: int
+    passenger_id: int
+    pickup: str
+    dropoff: str
+    pickup_lat: float
+    pickup_lng: float
+    drop_lat: float
+    drop_lng: float
+    seats: int = 1
+    # Must match the radius the passenger searched with, otherwise a ride that
+    # was offered to them would be refused at booking time.
+    max_detour_m: float = 5000.0
+
+
+class BookingStatusUpdate(BaseModel):
+    status: str  # pending | accepted | rejected | cancelled
+
+
+class BookingStartRequest(BaseModel):
+    otp: str
+
+
+class BookingRateRequest(BaseModel):
+    rater: str  # "passenger" rates the rider, "rider" rates the passenger
+    rating: float = Field(ge=1, le=5)
+    review: Optional[str] = None
 
 
 class UserActivityUpdate(BaseModel):

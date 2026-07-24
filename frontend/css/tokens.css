@@ -1,0 +1,146 @@
+/* AI Ride — design tokens
+   Style: Modern Dark (Cinema Mobile) — glassmorphism, ambient light, hairline
+   borders, no pure black. Type is the iOS system face (SF Pro) with Inter as
+   the fallback for non-Apple devices. */
+
+:root {
+  /* Colour — dark (primary) */
+  --color-deep: #020203;
+  --color-background: #050506;
+  --color-elevated: #0a0a0c;
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-surface-strong: rgba(255, 255, 255, 0.08);
+  --color-muted: rgba(255, 255, 255, 0.04);
+
+  --color-foreground: #ededef;
+  --color-foreground-soft: #b6bac2;
+  --color-foreground-dim: #8a8f98;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --hairline: rgba(255, 255, 255, 0.08);
+
+  --color-accent: #6e79e0;
+  --color-accent-hover: #808ae8;
+  --color-accent-soft: rgba(110, 121, 224, 0.16);
+  --color-accent-glow: rgba(110, 121, 224, 0.28);
+  --color-on-accent: #ffffff;
+
+  --color-success: #3ddc91;
+  --color-success-soft: rgba(61, 220, 145, 0.14);
+  --color-warning: #f5b544;
+  --color-warning-soft: rgba(245, 181, 68, 0.14);
+  --color-destructive: #ff6b6b;
+  --color-destructive-soft: rgba(255, 107, 107, 0.14);
+  --color-ring: #8f98f0;
+
+  --color-bike: #3ddc91;
+  --color-car: #6cc6ff;
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(22px) saturate(180%);
+  --glass-blur-heavy: blur(40px) saturate(180%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+  /* Typography — SF Pro on Apple, Inter everywhere else, then the platform's
+     own UI face (Segoe on Windows, Roboto on Android) if Inter cannot load. */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                  "Inter", "Segoe UI Variable Display", "Segoe UI", Roboto,
+                  "Helvetica Neue", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+               "Inter", "Segoe UI Variable Text", "Segoe UI", Roboto,
+               "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+               "Cascadia Mono", "Courier New", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.3125rem;
+  --text-2xl: 1.6875rem;
+  --text-3xl: 2.125rem;
+  --text-4xl: clamp(2.6rem, 6vw, 4.5rem);
+
+  --tracking-display: -0.035em;
+  --tracking-tight: -0.02em;
+  --tracking-wide: 0.06em;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+
+  /* Radius — iOS continuous-corner feel */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.6);
+  --shadow-accent: 0 12px 40px var(--color-accent-glow);
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur-base: 260ms;
+  --dur-slow: 420ms;
+
+  --header-h: 66px;
+  --content-max: 1200px;
+}
+
+:root[data-theme="light"] {
+  --color-deep: #eef1f7;
+  --color-background: #f4f6fb;
+  --color-elevated: #ffffff;
+  --color-surface: rgba(255, 255, 255, 0.72);
+  --color-surface-strong: rgba(255, 255, 255, 0.88);
+  --color-muted: rgba(15, 23, 42, 0.04);
+
+  --color-foreground: #0b0c10;
+  --color-foreground-soft: #3c4250;
+  --color-foreground-dim: #626a7a;
+
+  --color-border: rgba(15, 23, 42, 0.1);
+  --color-border-strong: rgba(15, 23, 42, 0.18);
+  --hairline: rgba(15, 23, 42, 0.1);
+
+  --color-accent: #4b56c4;
+  --color-accent-hover: #3d47ab;
+  --color-accent-soft: rgba(75, 86, 196, 0.12);
+  --color-accent-glow: rgba(75, 86, 196, 0.2);
+
+  --color-success: #16794a;
+  --color-success-soft: rgba(22, 121, 74, 0.12);
+  --color-warning: #96600d;
+  --color-warning-soft: rgba(150, 96, 13, 0.12);
+  --color-destructive: #bb2d2d;
+  --color-destructive-soft: rgba(187, 45, 45, 0.12);
+  --color-ring: #4b56c4;
+
+  --color-bike: #16794a;
+  --color-car: #0b6d9e;
+
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 20px 50px rgba(15, 23, 42, 0.14);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.16);
+}

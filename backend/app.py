@@ -32,17 +32,28 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from models import (
-    create_tables, create_user, create_route, get_routes_near_route, 
-    get_user, get_user_by_government_id, deposit_wallet, hold_escrow, 
-    release_escrow, refund_escrow, verify_user, recalculate_user_trust
+    create_tables, create_user, create_route, get_routes_near_route,
+    get_user, get_user_by_government_id, deposit_wallet, hold_escrow,
+    release_escrow, refund_escrow, verify_user, recalculate_user_trust,
+    get_connection
 )
 from schemas import (
     UserCreate, UserResponse, RouteCreate, RouteResponse,
     MatchRequest, MatchResponse, MatchCandidate,
     LoginRequest, OTPRequest, OTPVerify,
     WalletDepositRequest, EscrowHoldRequest, EscrowReleaseRequest, EscrowRefundRequest,
-    UserVerifyRequest, UserActivityUpdate
+    UserVerifyRequest, UserActivityUpdate,
+    RidePublishRequest, RideLocationUpdate, RideStatusUpdate, RideSearchRequest,
+    BookingCreate, BookingStatusUpdate, BookingStartRequest, BookingRateRequest
 )
+from rides import (
+    create_ride_tables, ensure_public_id, publish_ride, get_live_rides, get_ride,
+    get_rides_by_rider, update_ride_location, update_ride_status,
+    create_booking, get_bookings_for_passenger, get_bookings_for_rider,
+    get_booking, update_booking_status, start_booking_with_otp, complete_booking,
+    pay_booking, rate_booking, get_user_reviews
+)
+from matching import rank_rides, ride_distance_m, VEHICLE_DEFAULT_RATE
 from datetime import datetime, timedelta
 from route_engine import overlap_score, route_length, calculate_detour, calculate_overlap_score
 from ai_engine import (
@@ -76,15 +87,26 @@ def check_time_overlap(dt1: datetime, wait1: int, dt2: datetime, wait2: int) -> 
 
 app = FastAPI(title="AI Ride Sharing Backend")
 
+# Wildcard origins and credentials cannot be combined — browsers reject that
+# pairing — so origins are listed explicitly. Deployed front ends are added
+# through ALLOWED_ORIGINS (comma separated) without touching the code.
+_extra_origins = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:8080", 
+        "http://localhost:8080",
         "http://127.0.0.1:8080",
         "http://localhost:5500",
         "http://127.0.0.1:5500",
-        "*" # Fallback for local development
+        *_extra_origins,
     ],
+    # Local dev on any port, plus Vercel preview and production deployments.
+    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1):\d+|https://.*\.vercel\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -105,6 +127,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 def startup_event():
     create_tables()
+    create_ride_tables()
 
 
 @app.get("/", response_model=dict)
@@ -135,6 +158,8 @@ def register_user(user: UserCreate):
         if user.password:
             user_data["password_hash"] = hash_password(user.password)
         new_user = create_user(user_data)
+        # Every account gets a stable, shareable ID such as AR-000042.
+        new_user["public_id"] = ensure_public_id(new_user["id"])
         # Return safe dict — never expose password_hash, convert date→str
         safe = {k: (str(v) if hasattr(v, 'isoformat') else v)
                 for k, v in new_user.items() if k != "password_hash"}
@@ -194,7 +219,19 @@ def login(req: LoginRequest):
         raise HTTPException(status_code=401, detail="Incorrect password.")
     # Return user without password hash
     user.pop("password_hash", None)
-    return user
+    user["public_id"] = ensure_public_id(user["id"])
+    safe = {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()}
+    return safe
+
+
+@app.get("/users/{user_id}")
+def get_user_profile(user_id: int):
+    user = get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.pop("password_hash", None)
+    user["public_id"] = ensure_public_id(user_id)
+    return {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()}
 
 
 
@@ -550,3 +587,208 @@ def refund_escrow_funds(req: EscrowRefundRequest):
     if not success:
         raise HTTPException(status_code=400, detail="Insufficient escrow balance or user not found.")
     return {"success": True, "message": "Funds refunded from escrow back to wallet successfully"}
+
+
+# ── Rider portal ───────────────────────────────────────────────────────────
+
+@app.post("/rides/publish")
+def publish_rider_availability(req: RidePublishRequest):
+    """A traveller announces the journey they are already making."""
+    rider = get_user(req.rider_id)
+    if not rider:
+        raise HTTPException(status_code=404, detail="Rider not found.")
+
+    polyline = [p.dict() for p in req.polyline]
+    if len(polyline) < 2:
+        # Straight line between the two ends is enough to place them on the map.
+        polyline = [
+            {"latitude": req.origin_lat, "longitude": req.origin_lng},
+            {"latitude": req.dest_lat, "longitude": req.dest_lng},
+        ]
+
+    data = req.dict()
+    data["polyline"] = polyline
+    data["total_distance_m"] = route_length(polyline)
+    data["fare_per_km"] = req.fare_per_km or VEHICLE_DEFAULT_RATE.get(req.vehicle_type, 6.0)
+    if data.get("current_lat") is None:
+        data["current_lat"] = req.origin_lat
+        data["current_lng"] = req.origin_lng
+
+    ride = publish_ride(data)
+    return get_ride(ride["id"])
+
+
+@app.get("/rides/live")
+def list_live_rides():
+    """Every ride currently visible on the map."""
+    rides = get_live_rides()
+    for ride in rides:
+        ride["risk_level"] = classify_trust_risk_level(ride.get("rider_trust_score") or 50)
+        ride["ai_recommendation"] = get_ai_recommendation(ride.get("rider_trust_score") or 50)
+    return {"rides": rides, "count": len(rides)}
+
+
+@app.get("/rides/rider/{rider_id}")
+def list_rider_rides(rider_id: int):
+    return {"rides": get_rides_by_rider(rider_id)}
+
+
+@app.get("/rides/{ride_id}")
+def read_ride(ride_id: int):
+    ride = get_ride(ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found.")
+    return ride
+
+
+@app.post("/rides/{ride_id}/location")
+def push_ride_location(ride_id: int, req: RideLocationUpdate):
+    ride = update_ride_location(ride_id, req.latitude, req.longitude)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found.")
+    return ride
+
+
+@app.post("/rides/{ride_id}/status")
+def set_ride_status(ride_id: int, req: RideStatusUpdate):
+    allowed = {"available", "started", "completed", "cancelled"}
+    if req.status not in allowed:
+        raise HTTPException(status_code=400, detail=f"Status must be one of {sorted(allowed)}.")
+    ride = update_ride_status(ride_id, req.status)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found.")
+    return ride
+
+
+# ── Passenger portal ───────────────────────────────────────────────────────
+
+@app.post("/rides/search")
+def search_rides(req: RideSearchRequest):
+    """Find published rides that pass the passenger's pickup and drop, in order."""
+    rides = get_live_rides()
+    if req.passenger_id:
+        # You cannot ride along with yourself.
+        rides = [ride for ride in rides if ride["rider_id"] != req.passenger_id]
+    matches = rank_rides(
+        rides,
+        pickup=(req.pickup_lat, req.pickup_lng),
+        drop=(req.drop_lat, req.drop_lng),
+        seats=req.seats,
+        max_detour_m=req.max_detour_m,
+        min_overlap=req.min_overlap,
+    )
+    for match in matches:
+        trust = match.get("rider_trust_score") or 50
+        match["risk_level"] = classify_trust_risk_level(trust)
+        match["ai_recommendation"] = get_ai_recommendation(trust)
+        match["carbon_savings_kg"] = round(
+            estimate_carbon_savings(match["shared_distance_m"], match["passenger_distance_m"]), 3
+        )
+    return {"matches": matches, "count": len(matches)}
+
+
+@app.post("/bookings")
+def book_ride(req: BookingCreate):
+    passenger = get_user(req.passenger_id)
+    if not passenger:
+        raise HTTPException(status_code=404, detail="Passenger not found.")
+
+    ride = get_ride(req.ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found.")
+    if ride["rider_id"] == req.passenger_id:
+        raise HTTPException(status_code=400, detail="You cannot book your own ride.")
+
+    from matching import match_ride
+    score = match_ride(
+        ride,
+        (req.pickup_lat, req.pickup_lng),
+        (req.drop_lat, req.drop_lng),
+        max_detour_m=req.max_detour_m,
+    )
+    if not score:
+        raise HTTPException(status_code=400, detail="This ride does not cover your route.")
+
+    data = req.dict()
+    data.pop("max_detour_m", None)
+    data["fare"] = round(score["fare"] * req.seats, 2)
+    data["overlap_score"] = score["overlap_score"]
+    data["detour_m"] = score["detour_m"]
+
+    booking = create_booking(data)
+    if not booking:
+        raise HTTPException(status_code=400, detail="Not enough seats available on this ride.")
+    return get_booking(booking["id"])
+
+
+@app.get("/bookings/passenger/{passenger_id}")
+def list_passenger_bookings(passenger_id: int):
+    return {"bookings": get_bookings_for_passenger(passenger_id)}
+
+
+@app.get("/bookings/rider/{rider_id}")
+def list_rider_bookings(rider_id: int):
+    """The rider never sees the start code — the passenger reads it out."""
+    bookings = get_bookings_for_rider(rider_id)
+    for booking in bookings:
+        booking.pop("otp", None)
+    return {"bookings": bookings}
+
+
+@app.get("/bookings/{booking_id}")
+def read_booking(booking_id: int):
+    booking = get_booking(booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    return booking
+
+
+@app.post("/bookings/{booking_id}/status")
+def set_booking_status(booking_id: int, req: BookingStatusUpdate):
+    allowed = {"pending", "accepted", "rejected", "cancelled"}
+    if req.status not in allowed:
+        raise HTTPException(status_code=400, detail=f"Status must be one of {sorted(allowed)}.")
+    booking = update_booking_status(booking_id, req.status)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    return booking
+
+
+@app.post("/bookings/{booking_id}/start")
+def start_booking(booking_id: int, req: BookingStartRequest):
+    """Rider enters the passenger's 4-digit code to begin the trip."""
+    booking, error = start_booking_with_otp(booking_id, req.otp)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return booking
+
+
+@app.post("/bookings/{booking_id}/complete")
+def finish_booking(booking_id: int):
+    booking, error = complete_booking(booking_id)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return booking
+
+
+@app.post("/bookings/{booking_id}/pay")
+def settle_booking(booking_id: int):
+    booking, error = pay_booking(booking_id)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return booking
+
+
+@app.post("/bookings/{booking_id}/rate")
+def rate_trip(booking_id: int, req: BookingRateRequest):
+    if req.rater not in ("passenger", "rider"):
+        raise HTTPException(status_code=400, detail="rater must be 'passenger' or 'rider'.")
+    booking, error = rate_booking(booking_id, req.rater, req.rating, req.review)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return booking
+
+
+@app.get("/users/{user_id}/reviews")
+def list_user_reviews(user_id: int):
+    return {"reviews": get_user_reviews(user_id)}

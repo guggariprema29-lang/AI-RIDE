@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>AIRide – Sign Up & Login</title>
+  <meta name="description" content="Join AIRide – your smart AI-powered carpooling companion."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="shortcut icon" href="favicon.svg"/>
+  <link rel="stylesheet" href="auth.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+</head>
+<body>
+  <div class="auth-bg">
+    <div class="particles" id="particles"></div>
+    <div class="auth-card" id="auth-card">
+
+      <!-- ── STEP 0: LANDING ── -->
+      <div class="step active" id="step-landing">
+        <div class="logo-wrap">
+          <div class="logo-icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <rect width="40" height="40" rx="12" fill="url(#g1)"/>
+              <path d="M8 26l6-10 5 7 4-5 9 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="30" cy="14" r="4" fill="white" opacity="0.9"/>
+              <defs><linearGradient id="g1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#C026D3"/></defs>
+            </svg>
+          </div>
+          <h1 class="brand">AI<span>Ride</span></h1>
+        </div>
+        <p class="tagline">Your smart carpooling companion</p>
+        <div class="landing-actions">
+          <button class="btn-primary" id="btn-signup-start">Sign up</button>
+          <div class="divider"><span>or</span></div>
+          <button class="btn-outline" id="btn-login-start">Log in</button>
+        </div>
+        <p class="footer-note">By continuing, you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
+      </div>
+
+      <!-- ── STEP 1: SIGNUP EMAIL ── -->
+      <div class="step" id="step-su-email">
+        <button class="back-btn" data-target="step-landing">‹</button>
+        <div class="step-header">
+          <h2>What's your email?</h2>
+          <p class="sub">We'll send a confirmation after you sign up</p>
+        </div>
+        <button class="btn-facebook" id="btn-facebook">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Continue with Facebook
+        </button>
+        <button class="btn-google" id="btn-google">
+          <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
+        </button>
+        <div class="or-divider"><span>or sign up with email</span></div>
+        <div class="field-wrap">
+          <input type="text" id="su-email" class="field" placeholder=" " autocomplete="email" inputmode="email"/>
+          <label class="field-label" for="su-email">Email address</label>
+        </div>
+        <p id="su-email-error" class="field-error"></p>
+        <button class="btn-primary mt-24" id="btn-su-email-next">Continue</button>
+        <p class="hint-link">Already a member? <a href="#" id="goto-login-from-su">Log in</a></p>
+      </div>
+
+      <!-- ── STEP 2: SIGNUP NAME ── -->
+      <div class="step" id="step-su-name">
+        <button class="back-btn" data-target="step-su-email">‹</button>
+        <div class="step-header">
+          <h2>What's your name?</h2>
+          <p class="sub">This is how other riders will know you</p>
+        </div>
+        <div class="field-wrap">
+          <input type="text" id="su-fname" class="field" placeholder=" " autocomplete="given-name"/>
+          <label class="field-label" for="su-fname">First name</label>
+        </div>
+        <div class="field-wrap mt-14">
+          <input type="text" id="su-lname" class="field" placeholder=" " autocomplete="family-name"/>
+          <label class="field-label" for="su-lname">Last name</label>
+        </div>
+        <p id="su-name-error" class="field-error"></p>
+        <button class="btn-primary mt-24" id="btn-su-name-next">Continue</button>
+      </div>
+
+      <!-- ── STEP 3: DATE OF BIRTH ── -->
+      <div class="step" id="step-su-dob">
+        <button class="back-btn" data-target="step-su-name">‹</button>
+        <div class="step-header">
+          <h2>When's your birthday?</h2>
+          <p class="sub">You must be at least 18 years old to join</p>
+        </div>
+        <div class="dob-row">
+          <select id="dob-day" class="field select-field"><option value="">Day</option></select>
+          <select id="dob-month" class="field select-field">
+            <option value="">Month</option>
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+          <select id="dob-year" class="field select-field"><option value="">Year</option></select>
+        </div>
+        <p id="su-dob-error" class="field-error"></p>
+        <button class="btn-primary mt-24" id="btn-su-dob-next">Continue</button>
+      </div>
+
+      <!-- ── STEP 4: TITLE ── -->
+      <div class="step" id="step-su-title">
+        <button class="back-btn" data-target="step-su-dob">‹</button>
+        <div class="step-header">
+          <h2>How would you like to be addressed?</h2>
+          <p class="sub">This helps us personalise your experience</p>
+        </div>
+        <div class="title-options">
+          <button class="title-btn" data-title="Madam">
+            <span class="title-emoji">👩</span>
+            <div><strong>Miss / Madam</strong><span>She / Her</span></div>
+            <span class="check-icon">✓</span>
+          </button>
+          <button class="title-btn" data-title="Sir">
+            <span class="title-emoji">👨</span>
+            <div><strong>Sir</strong><span>He / Him</span></div>
+            <span class="check-icon">✓</span>
+          </button>
+          <button class="title-btn" data-title="Prefer not to say">
+            <span class="title-emoji">🤍</span>
+            <div><strong>I'd rather not say</strong><span>They / Them</span></div>
+            <span class="check-icon">✓</span>
+          </button>
+        </div>
+        <button class="btn-primary mt-20" id="btn-su-title-next" disabled>Continue</button>
+      </div>
+
+      <!-- ── STEP 5: PASSWORD ── -->
+      <div class="step" id="step-su-password">
+        <button class="back-btn" data-target="step-su-title">‹</button>
+        <div class="step-header">
+          <h2>Define your password</h2>
+          <p class="sub">Keep your account safe with a strong password</p>
+        </div>
+        <div class="field-wrap">
+          <input type="password" id="su-password" class="field" placeholder=" " autocomplete="new-password"/>
+          <label class="field-label" for="su-password">Password</label>
+          <button type="button" class="eye-btn" id="toggle-su-pw" aria-label="Show password">
+            <svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="pw-meter">
+          <div class="pw-bar-track">
+            <div class="pw-bar-fill" id="pw-bar"></div>
+          </div>
+          <span class="pw-label" id="pw-label">—</span>
+        </div>
+        <ul class="pw-rules">
+          <li id="r-len">At least 8 characters</li>
+          <li id="r-upper">One uppercase letter (A–Z)</li>
+          <li id="r-lower">One lowercase letter (a–z)</li>
+          <li id="r-num">One number (0–9)</li>
+          <li id="r-special">One special character (!@#$%^&*)</li>
+        </ul>
+        <button class="btn-primary mt-20" id="btn-su-pw-next" disabled>Continue</button>
+      </div>
+
+      <!-- ── STEP 6: PHONE ── -->
+      <div class="step" id="step-su-phone">
+        <button class="back-btn" data-target="step-su-password">‹</button>
+        <div class="step-header">
+          <h2>What's your phone number?</h2>
+          <p class="sub">We'll send a verification code via SMS</p>
+        </div>
+        <div class="phone-row">
+          <select id="phone-country" class="field select-field phone-code">
+            <option value="+91">🇮🇳 +91</option>
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+44">🇬🇧 +44</option>
+            <option value="+61">🇦🇺 +61</option>
+            <option value="+971">🇦🇪 +971</option>
+            <option value="+65">🇸🇬 +65</option>
+            <option value="+49">🇩🇪 +49</option>
+            <option value="+33">🇫🇷 +33</option>
+          </select>
+          <div class="field-wrap flex1">
+            <input type="tel" id="su-phone" class="field" placeholder=" "/>
+            <label class="field-label" for="su-phone">Phone number</label>
+          </div>
+        </div>
+        <p id="su-phone-error" class="field-error"></p>
+        <button class="btn-primary mt-24" id="btn-su-phone-next">Send Code</button>
+      </div>
+
+      <!-- ── STEP 7: OTP ── -->
+      <div class="step" id="step-su-otp">
+        <button class="back-btn" data-target="step-su-phone">‹</button>
+        <div class="step-header">
+          <h2>Enter the code</h2>
+          <p class="sub" id="otp-sub">We sent a 6-digit code to your number</p>
+        </div>
+        <div class="otp-row" id="otp-row">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box"/>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box"/>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box"/>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box"/>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box"/>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-box"/>
+        </div>
+        <p id="otp-error" class="field-error center"></p>
+        <p class="resend-line">Didn't get it? <a href="#" id="resend-btn">Resend code</a></p>
+        <button class="btn-primary mt-20" id="btn-verify-otp">Verify &amp; Create Account</button>
+      </div>
+
+      <!-- ── STEP 8: FACE VERIFICATION ── -->
+      <div class="step" id="step-su-face">
+        <button class="back-btn" data-target="step-su-otp">‹</button>
+        <div class="step-header">
+          <h2>Face Verification</h2>
+          <p class="sub">Verify your identity to increase your trust score</p>
+        </div>
+        
+        <div class="camera-container">
+          <video id="camera-feed" autoplay muted playsinline></video>
+          <canvas id="camera-overlay"></canvas>
+          <div class="camera-ui">
+            <div class="scan-line"></div>
+            <div id="face-status" class="face-status">Initializing camera...</div>
+          </div>
+        </div>
+
+        <div class="face-actions">
+          <button class="btn-primary" id="btn-capture-face" disabled>
+            <span class="icon">📸</span> Verify Identity
+          </button>
+          <button class="btn-outline" id="btn-skip-face">Skip for now</button>
+        </div>
+        <p class="footer-note">Verification data is processed locally on your device.</p>
+      </div>
+
+      <!-- ── LOGIN: EMAIL ── -->
+      <div class="step" id="step-li-email">
+        <button class="back-btn" data-target="step-landing">‹</button>
+        <div class="step-header">
+          <h2>Welcome back!</h2>
+          <p class="sub">Log in to your AIRide account</p>
+        </div>
+        <div class="field-wrap">
+          <input type="text" id="li-email" class="field" placeholder=" " autocomplete="email" inputmode="email"/>
+          <label class="field-label" for="li-email">Email address</label>
+        </div>
+        <p id="li-email-error" class="field-error"></p>
+        <button class="btn-primary mt-24" id="btn-li-email-next">Continue</button>
+        <p class="hint-link">New here? <a href="#" id="goto-signup-from-li">Sign up</a></p>
+      </div>
+
+      <!-- ── LOGIN: PASSWORD ── -->
+      <div class="step" id="step-li-password">
+        <button class="back-btn" data-target="step-li-email">‹</button>
+        <div class="step-header">
+          <h2>Enter your password</h2>
+          <p class="sub" id="li-pw-sub">Logging in as ...</p>
+        </div>
+        <div class="field-wrap">
+          <input type="password" id="li-password" class="field" placeholder=" " autocomplete="current-password"/>
+          <label class="field-label" for="li-password">Password</label>
+          <button type="button" class="eye-btn" id="toggle-li-pw" aria-label="Show password">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <a href="#" class="forgot-pw-link">Forgot password?</a>
+        <p id="li-pw-error" class="field-error"></p>
+        <button class="btn-primary mt-24" id="btn-li-submit">Log in</button>
+      </div>
+
+      <!-- ── SUCCESS ── -->
+      <div class="step" id="step-success">
+        <div class="success-wrap">
+          <div class="success-ring">
+            <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+              <circle cx="30" cy="30" r="28" stroke="url(#gs)" stroke-width="3"/>
+              <path d="M18 30l9 9 15-15" stroke="url(#gs)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <defs><linearGradient id="gs" x1="0" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#C026D3"/></linearGradient></defs>
+            </svg>
+          </div>
+          <h2 id="success-title">You're all set!</h2>
+          <p class="sub" id="success-sub">Welcome to AIRide 🎉</p>
+          <button class="btn-primary" id="btn-go-app">Go to App</button>
+        </div>
+      </div>
+
+    </div><!-- /.auth-card -->
+  </div><!-- /.auth-bg -->
+
+  <script src="auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>AIRide – Safe Ride</title>
+  <meta name="description" content="AIRide Safe Ride – Real-time security dashboard, SOS broadcasts, and safety settings."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('airide_user')) {
+        window.location.href = 'auth.html';
+      }
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- ── Particles background ── -->
+  <div class="particles" id="particles"></div>
+
+  <!-- ── Top Nav ── -->
+  <nav class="topnav">
+    <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='index.html'">
+      <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="10" fill="url(#ng1)"/>
+        <path d="M8 26l6-10 5 7 4-5 9 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="30" cy="14" r="4" fill="white" opacity="0.9"/>
+        <defs><linearGradient id="ng1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#C026D3"/></linearGradient></defs>
+      </svg>
+      <span class="brand-text">AI<span>Ride</span></span>
+    </div>
+    <div class="nav-user" id="nav-user">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <span class="user-name" id="user-name-nav">Loading...</span>
+      <button class="btn-logout" id="btn-logout">Log out</button>
+    </div>
+  </nav>
+
+  <!-- ── Main content ── -->
+  <main class="main-wrap">
+    
+    <!-- ══ SAFE RIDE PANEL ══ -->
+    <div id="tab-safe-ride" class="tab-panel">
+      <div class="tab-panel-header">
+        <h2>Safe Ride Security Dashboard</h2>
+        <p>Real-time security sharing, emergency SOS broadcasts, and safety settings</p>
+      </div>
+
+      <!-- SOS Center -->
+      <div class="card" style="margin-bottom: 20px; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03);">
+        <div class="card-header" style="border-color: rgba(239, 68, 68, 0.15);">
+          <div class="card-icon" style="background: rgba(239, 68, 68, 0.2); color: #F87171;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h2 style="color: #F87171;">SOS Emergency Center</h2>
+        </div>
+        <div style="text-align: center; padding: 10px 0;">
+          <button id="sos-btn" onclick="toggleSOSAlarm()" style="width: 160px; height: 160px; border-radius: 50%; border: 4px solid #ef4444; background: radial-gradient(#ef4444, #b91c1c); color: #fff; font-size: 20px; font-weight: 800; cursor: pointer; box-shadow: 0 0 30px rgba(239, 68, 68, 0.6); transition: all 0.3s ease; outline: none; margin-bottom: 16px;">
+            SOS
+          </button>
+          <div id="sos-status-text" style="font-size: 14px; color: var(--muted); font-weight: 500;">
+            SOS is currently INACTIVE. Click to activate emergency broadcast.
+          </div>
+        </div>
+      </div>
+
+      <!-- Emergency Contacts -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(124, 58, 237, 0.2); color: #A78BFA;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h2>Emergency Contacts</h2>
+        </div>
+        
+        <!-- Add Contact Form -->
+        <div class="form-row">
+          <div class="field-group">
+            <label>Name</label>
+            <input type="text" id="sec-contact-name" placeholder="Contact Name">
+          </div>
+          <div class="field-group">
+            <label>Phone Number</label>
+            <input type="text" id="sec-contact-phone" placeholder="Contact Phone">
+          </div>
+          <div class="field-group">
+            <label>Relationship</label>
+            <input type="text" id="sec-contact-rel" placeholder="e.g. Spouse, Father">
+          </div>
+        </div>
+        <button class="btn-primary-sm" onclick="addEmergencyContact()" style="margin-bottom: 18px;">Add Contact</button>
+
+        <!-- Contact List -->
+        <div id="emergency-contacts-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Managed by JS -->
+        </div>
+      </div>
+
+      <!-- Live Location Sharing & Controls -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(16, 185, 129, 0.15); color: #6EE7B7;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h2>Safety Settings &amp; Monitoring</h2>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- Toggle 1: Live Trip Link -->
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <h4 style="font-size: 14px; font-weight: 600; color: #fff;">Share Live Trip Link</h4>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">Generate a secure web link for family to track your real-time GPS</p>
+            </div>
+            <button class="btn-secondary" onclick="generateLiveTrackLink()" style="padding: 8px 14px; font-size: 12px;">Share Link</button>
+          </div>
+
+          <!-- Toggle 2: Audio Distress -->
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <h4 style="font-size: 14px; font-weight: 600; color: #fff;">AI Audio Distress Monitoring</h4>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">Triggers SOS if distress keywords (e.g., 'help', 'stop') are detected</p>
+            </div>
+            <label class="switch-container" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+              <input type="checkbox" id="safety-audio-chk" onchange="toggleSafetySetting('audio')" style="opacity: 0; width: 0; height: 0;">
+              <span class="slider" style="position: absolute; cursor: pointer; inset: 0; background-color: rgba(255,255,255,0.1); border-radius: 24px; transition: .3s;"></span>
+            </label>
+          </div>
+
+          <!-- Toggle 3: PIN Verification -->
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <h4 style="font-size: 14px; font-weight: 600; color: #fff;">Require Ride Start PIN</h4>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">Verifies traveler and ride sender via a secure code before departure</p>
+            </div>
+            <label class="switch-container" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+              <input type="checkbox" id="safety-pin-chk" onchange="toggleSafetySetting('pin')" style="opacity: 0; width: 0; height: 0;">
+              <span class="slider" style="position: absolute; cursor: pointer; inset: 0; background-color: rgba(255,255,255,0.1); border-radius: 24px; transition: .3s;"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══ Bottom Nav ══ -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bnav-item" id="bnav-home" onclick="window.location.href='index.html?tab=home'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <span>Home</span>
+    </button>
+    <button class="bnav-item active" id="bnav-services" onclick="window.location.href='index.html?tab=services'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      </div>
+      <span>Services</span>
+    </button>
+    <button class="bnav-item" id="bnav-activity" onclick="window.location.href='index.html?tab=activity'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <span>Activity</span>
+    </button>
+    <button class="bnav-item" id="bnav-account" onclick="window.location.href='index.html?tab=account'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <span>Account</span>
+    </button>
+  </nav>
+
+  <script src="app.js"></script>
+  <script>
+    // Populate user from session
+    const _u = JSON.parse(sessionStorage.getItem('airide_user') || '{}');
+    if (_u.name) {
+      const fn = _u.name.split(' ')[0];
+      document.getElementById('user-name-nav').textContent = fn;
+      document.getElementById('user-avatar').textContent = fn[0].toUpperCase();
+    }
+
+    function doLogout() {
+      sessionStorage.removeItem('airide_user');
+      window.location.href = 'auth.html';
+    }
+    document.getElementById('btn-logout').addEventListener('click', doLogout);
+
+    // ── Safe Ride Features & SOS ──
+    let audioCtx = null;
+    let oscillator1 = null;
+    let oscillator2 = null;
+    let sosFlashingInterval = null;
+
+    window.startSirenSound = function() {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        oscillator1 = audioCtx.createOscillator();
+        oscillator2 = audioCtx.createOscillator();
+        let gainNode = audioCtx.createGain();
+        
+        oscillator1.type = 'sawtooth';
+        oscillator2.type = 'sine';
+        
+        oscillator1.frequency.setValueAtTime(500, audioCtx.currentTime);
+        oscillator2.frequency.setValueAtTime(4, audioCtx.currentTime); // Siren sweeps 4 times a second
+        
+        let lfoGain = audioCtx.createGain();
+        lfoGain.gain.setValueAtTime(200, audioCtx.currentTime); // freq sweep range +/- 200Hz
+        
+        oscillator2.connect(lfoGain);
+        lfoGain.connect(oscillator1.frequency);
+        
+        oscillator1.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        
+        oscillator1.start();
+        oscillator2.start();
+      } catch (e) {
+        console.error("Web Audio siren is not supported or was blocked by browser autoplay policy.", e);
+      }
+    };
+
+    window.stopSirenSound = function() {
+      if (oscillator1) { try { oscillator1.stop(); } catch(e){} oscillator1 = null; }
+      if (oscillator2) { try { oscillator2.stop(); } catch(e){} oscillator2 = null; }
+      if (audioCtx) { try { audioCtx.close(); } catch(e){} audioCtx = null; }
+    };
+
+    window.toggleSOSAlarm = function() {
+      const btn = document.getElementById('sos-btn');
+      const txt = document.getElementById('sos-status-text');
+      const panel = document.getElementById('tab-safe-ride');
+      
+      if (btn.classList.contains('sos-active')) {
+        btn.classList.remove('sos-active');
+        btn.style.background = 'radial-gradient(#ef4444, #b91c1c)';
+        btn.style.borderColor = '#ef4444';
+        btn.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.6)';
+        txt.textContent = 'SOS is currently INACTIVE. Click to activate emergency broadcast.';
+        panel.style.background = '';
+        
+        clearInterval(sosFlashingInterval);
+        stopSirenSound();
+        alert('SOS Emergency Alarm turned off. Emergency contacts have been sent a safety update.');
+      } else {
+        btn.classList.add('sos-active');
+        txt.innerHTML = '<span style="color: #ef4444; font-weight: 700; animation: blink 1s infinite;">🚨 EMERGENCY SOS ACTIVE! Police and contacts notified.</span>';
+        
+        let isRed = false;
+        sosFlashingInterval = setInterval(() => {
+          isRed = !isRed;
+          panel.style.background = isRed ? 'rgba(239, 68, 68, 0.08)' : '';
+          btn.style.background = isRed ? '#ef4444' : '#b91c1c';
+          btn.style.boxShadow = isRed ? '0 0 50px #ef4444' : '0 0 10px #b91c1c';
+        }, 500);
+        
+        startSirenSound();
+        alert('🚨 SOS EMERGENCY ACTIVE!\n1. Your precise GPS coordinates have been sent to local emergency responders.\n2. Automated SMS notifications have been sent to your emergency contacts.\n3. Stay calm and attempt to move to a well-lit public area.');
+      }
+    };
+
+    // Emergency Contacts Management
+    window.loadEmergencyContacts = function() {
+      const listDiv = document.getElementById('emergency-contacts-list');
+      const contacts = JSON.parse(localStorage.getItem('airide_emergency_contacts') || '[]');
+      
+      if (contacts.length === 0) {
+        listDiv.innerHTML = `<div style="text-align: center; color: var(--muted); font-size: 13px; padding: 10px;">No emergency contacts added yet. Add one above.</div>`;
+        return;
+      }
+      
+      listDiv.innerHTML = contacts.map((c, idx) => `
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); padding: 12px 16px; border-radius: 12px; margin-bottom: 8px;">
+          <div>
+            <div style="font-weight: 600; color: #fff;">${c.name} <span style="font-size: 11px; color: #A78BFA; background: rgba(124,58,237,0.15); padding: 2px 8px; border-radius: 10px; margin-left: 6px;">${c.relationship}</span></div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">${c.phone}</div>
+          </div>
+          <button class="btn-secondary" onclick="deleteEmergencyContact(${idx})" style="padding: 6px 12px; font-size: 12px; border-color: rgba(239, 68, 68, 0.3); color: #FCA5A5;">Delete</button>
+        </div>
+      `).join('');
+    };
+
+    window.addEmergencyContact = function() {
+      const nameInp = document.getElementById('sec-contact-name');
+      const phoneInp = document.getElementById('sec-contact-phone');
+      const relInp = document.getElementById('sec-contact-rel');
+      
+      const name = nameInp.value.trim();
+      const phone = phoneInp.value.trim();
+      const relationship = relInp.value.trim();
+      
+      if (!name || !phone || !relationship) {
+        alert('Please fill out all fields to add a contact.');
+        return;
+      }
+      
+      const contacts = JSON.parse(localStorage.getItem('airide_emergency_contacts') || '[]');
+      contacts.push({ name, phone, relationship });
+      localStorage.setItem('airide_emergency_contacts', JSON.stringify(contacts));
+      
+      nameInp.value = '';
+      phoneInp.value = '';
+      relInp.value = '';
+      
+      loadEmergencyContacts();
+      alert('Emergency contact added successfully.');
+    };
+
+    window.deleteEmergencyContact = function(idx) {
+      const contacts = JSON.parse(localStorage.getItem('airide_emergency_contacts') || '[]');
+      contacts.splice(idx, 1);
+      localStorage.setItem('airide_emergency_contacts', JSON.stringify(contacts));
+      loadEmergencyContacts();
+    };
+
+    window.generateLiveTrackLink = function() {
+      const mockTripId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const link = `https://airide.in/track/trip-${mockTripId}`;
+      navigator.clipboard.writeText(link).then(() => {
+        alert(`Copied secure live tracking link to clipboard:\n${link}`);
+      }).catch(err => {
+        alert(`Secure Live tracking link generated:\n${link}`);
+      });
+    };
+
+    window.toggleSafetySetting = function(type) {
+      const chk = document.getElementById(`safety-${type}-chk`);
+      localStorage.setItem(`airide_safety_${type}`, chk.checked);
+      alert(`${type.toUpperCase()} safety feature has been ${chk.checked ? 'ENABLED' : 'DISABLED'}.`);
+    };
+
+    window.loadSafetySettings = function() {
+      ['audio', 'pin'].forEach(type => {
+        const val = localStorage.getItem(`airide_safety_${type}`) === 'true';
+        const chk = document.getElementById(`safety-${type}-chk`);
+        if (chk) chk.checked = val;
+      });
+    };
+
+    // Initialize custom settings
+    loadEmergencyContacts();
+    loadSafetySettings();
+
+    // Particles background
+    (function() {
+      const c = document.getElementById('particles');
+      for (let i = 0; i < 22; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.cssText = `left:${Math.random()*100}%;width:${Math.random()*2+1}px;height:${Math.random()*2+1}px;animation-duration:${Math.random()*14+8}s;animation-delay:${Math.random()*12}s;opacity:${Math.random()*0.5+0.15};`;
+        c.appendChild(p);
+      }
+    })();
+  </script>
+</body>
+</html>

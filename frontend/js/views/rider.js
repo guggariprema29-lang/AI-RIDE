@@ -93,6 +93,48 @@ export default function riderView(container) {
               ${icon('navigation', 18)} I'm available — publish ride
             </button>
           </form>
+
+          <section class="card" style="margin-top:var(--space-4);background:var(--color-surface-dim)">
+            <div class="card-title">
+              <span class="portal-icon">${icon('clock', 20)}</span>
+              <h3>📅 Recurring Office/College Commute</h3>
+            </div>
+            <p class="xsmall muted" style="margin-bottom:var(--space-3)">
+              Set an automated weekly schedule (e.g. Mon-Fri at 8:30 AM). Your ride auto-publishes and auto-books subscribed daily commuters!
+            </p>
+
+            <form data-recurring-form class="stack small">
+              <div class="field">
+                <label for="rec-title">Commute Name</label>
+                <input id="rec-title" type="text" placeholder="Daily Office Route" value="Daily Office/College Commute" required />
+              </div>
+
+              <div class="field">
+                <label>Repeat Days</label>
+                <div class="row-tight" style="gap:var(--space-2);flex-wrap:wrap">
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="mon" checked /> Mon</label>
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="tue" checked /> Tue</label>
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="wed" checked /> Wed</label>
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="thu" checked /> Thu</label>
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="fri" checked /> Fri</label>
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="sat" /> Sat</label>
+                  <label class="badge" style="cursor:pointer;background:var(--color-surface);border:1px solid var(--color-border)"><input type="checkbox" name="rec_day" value="sun" /> Sun</label>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="rec-time">Daily Departure Time</label>
+                <input id="rec-time" type="time" value="08:30" required />
+              </div>
+
+              <button class="btn btn-sm btn-ghost" type="submit">${icon('check', 14)} Save Recurring Schedule</button>
+            </form>
+
+            <div style="margin-top:var(--space-4);border-top:1px dashed var(--color-border);padding-top:var(--space-3)">
+              <h4 class="small" style="margin:0 0 var(--space-2)">Your Active Schedules</h4>
+              <div data-schedules-list class="stack small muted">Loading schedules...</div>
+            </div>
+          </section>
         </section>
 
         <div class="stack">
@@ -386,6 +428,110 @@ export default function riderView(container) {
   }
 
   container.querySelector('[data-refresh]').addEventListener('click', refresh);
+
+  const schedulesListNode = container.querySelector('[data-schedules-list]');
+
+  async function loadSchedules() {
+    if (!schedulesListNode) return;
+    try {
+      const res = await api.userSchedules(user.id);
+      const list = res.schedules || [];
+      if (!list.length) {
+        schedulesListNode.innerHTML = '<p class="xsmall muted" style="margin:0">No recurring schedules created yet.</p>';
+        return;
+      }
+      schedulesListNode.innerHTML = list.map((s) => `
+        <div class="card-sm" style="background:var(--color-surface);border:1px solid var(--color-border);padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);margin-bottom:var(--space-2)">
+          <div class="row-tight" style="justify-content:space-between;margin-bottom:4px">
+            <strong>${escapeHtml(s.title)}</strong>
+            <span class="badge ${s.status === 'active' ? 'badge-success' : 'badge-warning'}">${s.status.toUpperCase()}</span>
+          </div>
+          <div class="xsmall muted">
+            <div><strong>Route:</strong> ${escapeHtml(s.origin.split(',')[0])} ➔ ${escapeHtml(s.destination.split(',')[0])}</div>
+            <div><strong>Time:</strong> ${escapeHtml(s.departure_time_str)} · <strong>Days:</strong> ${(s.days_of_week || []).join(', ').toUpperCase()}</div>
+            <div><strong>Subscribers:</strong> ${s.subscriber_count || 0} daily commuters</div>
+          </div>
+          <div class="row-tight" style="justify-content:flex-end;margin-top:var(--space-2)">
+            <button class="btn btn-xs btn-ghost" data-toggle-schedule="${s.id}">
+              ${s.status === 'active' ? '⏸ Pause Schedule' : '▶️ Resume Schedule'}
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      schedulesListNode.querySelectorAll('[data-toggle-schedule]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.dataset.toggleSchedule);
+          try {
+            await api.toggleSchedule(id);
+            toast('Schedule status updated', 'success');
+            loadSchedules();
+          } catch (err) {
+            toast(err.message, 'error');
+          }
+        });
+      });
+    } catch (err) {
+      schedulesListNode.innerHTML = `<p class="xsmall muted" style="margin:0">${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  loadSchedules();
+
+  container.querySelector('[data-recurring-form]')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const from = fromField.value;
+    const to = toField.value;
+    if (!from || !to) {
+      toast('Please set your origin and destination location first above.', 'error');
+      return;
+    }
+
+    const title = container.querySelector('#rec-title').value.trim();
+    const timeStr = container.querySelector('#rec-time').value;
+    const selectedDays = Array.from(container.querySelectorAll('input[name="rec_day"]:checked')).map((cb) => cb.value);
+
+    if (!selectedDays.length) {
+      toast('Select at least one day for recurring commute.', 'error');
+      return;
+    }
+
+    const button = e.currentTarget.querySelector('button[type="submit"]');
+    setBusy(button, true, 'Saving schedule...');
+
+    try {
+      const route = await roadRoute(from, to);
+      await api.createRecurringSchedule({
+        user_id: user.id,
+        schedule_type: 'rider_ride',
+        title: title || 'Daily Commute',
+        days_of_week: selectedDays,
+        departure_time_str: timeStr,
+        origin: from.short || from.label,
+        destination: to.short || to.label,
+        origin_lat: from.lat,
+        origin_lng: from.lng,
+        dest_lat: to.lat,
+        dest_lng: to.lng,
+        polyline: route.polyline,
+        total_distance_m: route.distance_m || 0.0,
+        vehicle_type: vehicle,
+        vehicle_number: container.querySelector('#vehicle-number').value.trim() || null,
+        seats_total: Number(seatsInput.value) || 1,
+        fare_per_km: Number(rateInput.value) || 6.0,
+        women_only: container.querySelector('#women-only')?.checked || false,
+        notes: container.querySelector('#notes').value.trim() || null,
+      });
+
+      toast('Recurring commute schedule created!', 'success');
+      loadSchedules();
+      refresh();
+    } catch (err) {
+      toast(err.message || 'Failed to create recurring schedule', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
 
   refresh();
   refreshTimer = setInterval(refresh, 20000);

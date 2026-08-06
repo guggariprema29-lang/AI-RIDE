@@ -51,7 +51,13 @@ from schemas import (
     UserVerifyRequest, UserActivityUpdate,
     RidePublishRequest, RideLocationUpdate, RideStatusUpdate, RideSearchRequest,
     BookingCreate, RelayBookingCreate, BookingStatusUpdate, BookingStartRequest, BookingRateRequest,
-    ParcelCreate, ParcelAcceptRequest, ParcelOTPVerify
+    ParcelCreate, ParcelAcceptRequest, ParcelOTPVerify,
+    RecurringScheduleCreate, RecurringSubscribeRequest
+)
+from recurring import (
+    create_recurring_schedule, get_user_recurring_schedules, get_recurring_schedule,
+    toggle_recurring_schedule, subscribe_to_schedule, get_schedule_subscriptions,
+    search_recurring_schedules, process_recurring_schedules
 )
 from rides import (
     create_ride_tables, ensure_public_id, publish_ride, get_live_rides, get_nearby_rides, get_ride,
@@ -1074,3 +1080,51 @@ def cancel_parcel_endpoint(parcel_id: int, payload: dict):
     if error:
         raise HTTPException(status_code=400, detail=error)
     return parcel
+
+
+# ── Recurring Commute Scheduler endpoints ───────────────────────────────────
+
+@app.post("/schedules/create")
+def create_recurring_schedule_endpoint(req: RecurringScheduleCreate):
+    user = get_user(req.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    data = req.dict()
+    data["polyline"] = [p.dict() for p in req.polyline]
+    schedule = create_recurring_schedule(data)
+    process_recurring_schedules()
+    return schedule
+
+
+@app.get("/schedules/user/{user_id}")
+def list_user_schedules_endpoint(user_id: int):
+    return {"schedules": get_user_recurring_schedules(user_id)}
+
+
+@app.get("/schedules/search")
+def search_recurring_schedules_endpoint(passenger_gender: str = "unspecified", women_only_filter: bool = False):
+    schedules = search_recurring_schedules(passenger_gender=passenger_gender, women_only_filter=women_only_filter)
+    return {"schedules": schedules, "count": len(schedules)}
+
+
+@app.post("/schedules/{schedule_id}/toggle")
+def toggle_recurring_schedule_endpoint(schedule_id: int):
+    schedule = toggle_recurring_schedule(schedule_id)
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found.")
+    return schedule
+
+
+@app.post("/schedules/{schedule_id}/subscribe")
+def subscribe_recurring_schedule_endpoint(schedule_id: int, req: RecurringSubscribeRequest):
+    sub, err = subscribe_to_schedule(schedule_id, req.subscriber_id, req.dict())
+    if not sub:
+        raise HTTPException(status_code=400, detail=err)
+    process_recurring_schedules()
+    return {"subscription": sub, "message": "Subscribed to daily commute!"}
+
+
+@app.post("/schedules/trigger-generation")
+def trigger_schedule_generation_endpoint():
+    result = process_recurring_schedules()
+    return result

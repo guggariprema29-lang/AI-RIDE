@@ -285,3 +285,41 @@ class ParcelAcceptRequest(BaseModel):
 class ParcelOTPVerify(BaseModel):
     otp: str
 
+
+class RecurringScheduleCreate(BaseModel):
+    user_id: int
+    schedule_type: str = "rider_ride"  # 'rider_ride' or 'sender_parcel'
+    title: str = "Daily Office/College Commute"
+    days_of_week: List[str] = Field(default_factory=lambda: ["mon", "tue", "wed", "thu", "fri"])
+    departure_time_str: str = "08:30"
+    origin: str
+    destination: str
+    origin_lat: float
+    origin_lng: float
+    dest_lat: float
+    dest_lng: float
+    polyline: List[RoutePoint] = Field(default_factory=list)
+    total_distance_m: float = 0.0
+    vehicle_type: str = "car"
+    vehicle_number: Optional[str] = None
+    seats_total: int = 1
+    fare_per_km: float = 6.0
+    parcel_category: str = "documents"
+    parcel_weight_kg: float = 1.0
+    parcel_fare: float = 60.0
+    receiver_name: Optional[str] = None
+    receiver_phone: Optional[str] = None
+    women_only: bool = False
+    notes: Optional[str] = None
+
+
+class RecurringSubscribeRequest(BaseModel):
+    subscriber_id: int
+    seats: int = 1
+    pickup: Optional[str] = None
+    dropoff: Optional[str] = None
+    pickup_lat: Optional[float] = None
+    pickup_lng: Optional[float] = None
+    drop_lat: Optional[float] = None
+    drop_lng: Optional[float] = None
+

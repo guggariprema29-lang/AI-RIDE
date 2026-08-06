@@ -72,6 +72,11 @@ def create_tables():
             postgis_available = False
         cursor.execute(CREATE_USERS_TABLE)
         cursor.execute(CREATE_ROUTES_TABLE)
+        try:
+            from recurring import create_recurring_tables
+            create_recurring_tables()
+        except Exception as e:
+            print(f"[DB] Recurring tables init notice: {e}")
         # Ensure all columns exist (safe to run multiple times)
         migrations = [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS government_id TEXT;",

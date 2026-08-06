@@ -67,6 +67,14 @@ export default function passengerView(container) {
           </form>
 
           <div data-recent style="margin-top:var(--space-4)"></div>
+
+          <div class="card" style="margin-top:var(--space-4);background:var(--color-surface-dim)">
+            <h4 style="margin:0 0 var(--space-2)">📅 Recurring Office/College Commutes</h4>
+            <p class="xsmall muted" style="margin-bottom:var(--space-3)">
+              Subscribe to regular daily commutes for auto-reserved seats every work/college day!
+            </p>
+            <div data-recurring-browse class="stack small muted">Loading recurring commutes...</div>
+          </div>
         </section>
 
         <div class="stack">
@@ -181,6 +189,59 @@ export default function passengerView(container) {
   }
 
   renderRecent();
+
+  const recBrowseNode = container.querySelector('[data-recurring-browse]');
+
+  async function loadRecurringBrowse() {
+    if (!recBrowseNode) return;
+    try {
+      const res = await api.searchSchedules(user.gender || 'unspecified');
+      const list = (res.schedules || []).filter((s) => s.user_id !== user.id);
+      if (!list.length) {
+        recBrowseNode.innerHTML = '<p class="xsmall muted" style="margin:0">No active recurring commutes available right now.</p>';
+        return;
+      }
+      recBrowseNode.innerHTML = list.map((s) => `
+        <div class="card-sm" style="background:var(--color-surface);border:1px solid var(--color-border);padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);margin-bottom:var(--space-2)">
+          <div class="row-tight" style="justify-content:space-between;margin-bottom:4px">
+            <strong>${escapeHtml(s.title)}</strong>
+            <span class="badge badge-accent">${escapeHtml(s.user_name)}</span>
+          </div>
+          <div class="xsmall muted">
+            <div><strong>Route:</strong> ${escapeHtml(s.origin.split(',')[0])} ➔ ${escapeHtml(s.destination.split(',')[0])}</div>
+            <div><strong>Time:</strong> ${escapeHtml(s.departure_time_str)} · <strong>Days:</strong> ${(s.days_of_week || []).join(', ').toUpperCase()}</div>
+          </div>
+          <div class="row-tight" style="justify-content:flex-end;margin-top:var(--space-2)">
+            <button class="btn btn-xs btn-primary" data-subscribe-schedule="${s.id}">
+              ${icon('ticket', 12)} Subscribe Daily Pass
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      recBrowseNode.querySelectorAll('[data-subscribe-schedule]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.dataset.subscribeSchedule);
+          setBusy(btn, true, 'Subscribing…');
+          try {
+            await api.subscribeSchedule(id, {
+              subscriber_id: user.id,
+              seats: 1,
+            });
+            toast('Subscribed! Seats will auto-reserve on commute days.', 'success');
+            loadRecurringBrowse();
+          } catch (err) {
+            toast(err.message || 'Failed to subscribe', 'error');
+            setBusy(btn, false);
+          }
+        });
+      });
+    } catch (err) {
+      recBrowseNode.innerHTML = `<p class="xsmall muted" style="margin:0">${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  loadRecurringBrowse();
 
   /* ── Search ────────────────────────────────────────────────────────────── */
 

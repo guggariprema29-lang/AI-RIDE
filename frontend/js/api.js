@@ -145,6 +145,12 @@ export const api = {
   verifyParcelPickup: (id, otp) => request(`/parcels/${id}/verify-pickup`, { method: 'POST', body: { otp } }),
   verifyParcelDelivery: (id, otp) => request(`/parcels/${id}/verify-delivery`, { method: 'POST', body: { otp } }),
   cancelParcel: (id, userId) => request(`/parcels/${id}/cancel`, { method: 'POST', body: { user_id: userId } }),
+
+  createRecurringSchedule: (payload) => request('/schedules/create', { method: 'POST', body: payload }),
+  userSchedules: (userId) => request(`/schedules/user/${userId}`),
+  searchSchedules: (gender = 'unspecified', womenOnly = false) => request(`/schedules/search?passenger_gender=${gender}&women_only_filter=${womenOnly}`),
+  toggleSchedule: (id) => request(`/schedules/${id}/toggle`, { method: 'POST', body: {} }),
+  subscribeSchedule: (id, payload) => request(`/schedules/${id}/subscribe`, { method: 'POST', body: payload }),
 };
 
 export function connectNotificationWS(userId, onMessage) {

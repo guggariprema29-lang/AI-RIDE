@@ -69,22 +69,24 @@ class TestRecurringCommuteScheduler(unittest.TestCase):
         self.assertTrue(any(s["id"] == schedule["id"] for s in my_schedules))
         print(f"[OK] Rider can retrieve active schedules list (Total: {len(my_schedules)})")
 
-        # 4. Passenger searches and subscribes to recurring commute
+        # 4. Passenger searches and subscribes to recurring commute (with default pickup/dropoff)
         public_schedules = search_recurring_schedules()
         self.assertTrue(any(s["id"] == schedule["id"] for s in public_schedules))
         print(f"[OK] Public search returns recurring schedule")
 
         sub, err = subscribe_to_schedule(schedule["id"], passenger["id"], {
             "seats": 1,
-            "pickup": schedule["origin"],
-            "dropoff": schedule["destination"],
-            "pickup_lat": schedule["origin_lat"],
-            "pickup_lng": schedule["origin_lng"],
-            "drop_lat": schedule["dest_lat"],
-            "drop_lng": schedule["dest_lng"],
+            "pickup": None,
+            "dropoff": None,
+            "pickup_lat": None,
+            "pickup_lng": None,
+            "drop_lat": None,
+            "drop_lng": None,
         })
-        self.assertIsNotNone(sub)
-        print(f"[OK] Passenger ({passenger['name']}) subscribed to Schedule #{schedule['id']}")
+        self.assertIsNotNone(sub, f"Subscription failed with error: {err}")
+        self.assertEqual(sub["pickup"], schedule["origin"])
+        self.assertEqual(sub["dropoff"], schedule["destination"])
+        print(f"[OK] Passenger ({passenger['name']}) subscribed with default pickup ({sub['pickup']}) & dropoff ({sub['dropoff']})")
 
         # 5. Process recurring schedules (Auto-generates live ride + auto-books passenger)
         res = process_recurring_schedules()

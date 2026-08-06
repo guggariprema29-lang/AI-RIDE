@@ -203,6 +203,13 @@ def subscribe_to_schedule(schedule_id: int, subscriber_id: int, data: dict) -> t
     if schedule["status"] != "active":
         return None, "This schedule is currently paused."
 
+    pickup = data.get("pickup") or schedule["origin"]
+    dropoff = data.get("dropoff") or schedule["destination"]
+    pickup_lat = data.get("pickup_lat") if data.get("pickup_lat") is not None else schedule["origin_lat"]
+    pickup_lng = data.get("pickup_lng") if data.get("pickup_lng") is not None else schedule["origin_lng"]
+    drop_lat = data.get("drop_lat") if data.get("drop_lat") is not None else schedule["dest_lat"]
+    drop_lng = data.get("drop_lng") if data.get("drop_lng") is not None else schedule["dest_lng"]
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -228,12 +235,12 @@ def subscribe_to_schedule(schedule_id: int, subscriber_id: int, data: dict) -> t
                     schedule_id,
                     subscriber_id,
                     data.get("seats", 1),
-                    data.get("pickup", schedule["origin"]),
-                    data.get("dropoff", schedule["destination"]),
-                    data.get("pickup_lat", schedule["origin_lat"]),
-                    data.get("pickup_lng", schedule["origin_lng"]),
-                    data.get("drop_lat", schedule["dest_lat"]),
-                    data.get("drop_lng", schedule["dest_lng"]),
+                    pickup,
+                    dropoff,
+                    pickup_lat,
+                    pickup_lng,
+                    drop_lat,
+                    drop_lng,
                 ),
             )
             sub = cursor.fetchone()

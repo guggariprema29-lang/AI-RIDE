@@ -196,7 +196,7 @@ export default function passengerView(container) {
     if (!recBrowseNode) return;
     try {
       const res = await api.searchSchedules(user.gender || 'unspecified');
-      const list = (res.schedules || []).filter((s) => s.user_id !== user.id);
+      const list = (res.schedules || []).filter((s) => Number(s.user_id) !== Number(user.id));
       if (!list.length) {
         recBrowseNode.innerHTML = '<p class="xsmall muted" style="margin:0">No active recurring commutes available right now.</p>';
         return;
@@ -225,7 +225,7 @@ export default function passengerView(container) {
           setBusy(btn, true, 'Subscribing…');
           try {
             await api.subscribeSchedule(id, {
-              subscriber_id: user.id,
+              subscriber_id: Number(user.id),
               seats: 1,
             });
             toast('Subscribed! Seats will auto-reserve on commute days.', 'success');

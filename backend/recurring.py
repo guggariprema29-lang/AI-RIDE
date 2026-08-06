@@ -198,7 +198,7 @@ def subscribe_to_schedule(schedule_id: int, subscriber_id: int, data: dict) -> t
     schedule = get_recurring_schedule(schedule_id)
     if not schedule:
         return None, "Schedule not found."
-    if schedule["user_id"] == subscriber_id:
+    if int(schedule["user_id"]) == int(subscriber_id):
         return None, "You cannot subscribe to your own schedule."
     if schedule["status"] != "active":
         return None, "This schedule is currently paused."

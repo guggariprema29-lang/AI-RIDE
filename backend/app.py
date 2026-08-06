@@ -1,3 +1,5 @@
+import asyncio
+import re
 import traceback
 import random
 import hashlib
@@ -11,13 +13,14 @@ load_dotenv()  # loads .env from backend directory
 TWILIO_SID  = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM  = os.getenv("TWILIO_FROM_NUMBER", "")
+TWILIO_VERIFY_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
 
-if TWILIO_SID and TWILIO_TOKEN and not TWILIO_FROM.startswith("+1XXXXX"):
+if TWILIO_SID and TWILIO_TOKEN:
     try:
         from twilio.rest import Client as TwilioClient
         _twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
         _twilio_ready = True
-        print(f"[Twilio] SMS ready — sending from {TWILIO_FROM}")
+        print(f"[Twilio] Real SMS Engine ready (Verify Service: {TWILIO_VERIFY_SID})")
     except Exception as e:
         _twilio = None
         _twilio_ready = False
@@ -28,9 +31,12 @@ else:
     print("[Twilio] Not configured — running in demo mode (OTP shown on screen)")
 
 import psycopg2
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from auth_jwt import create_access_token, decode_access_token
+from ws_manager import manager
 from models import (
     create_tables, create_user, create_route, get_routes_near_route,
     get_user, get_user_by_government_id, deposit_wallet, hold_escrow,
@@ -44,23 +50,39 @@ from schemas import (
     WalletDepositRequest, EscrowHoldRequest, EscrowReleaseRequest, EscrowRefundRequest,
     UserVerifyRequest, UserActivityUpdate,
     RidePublishRequest, RideLocationUpdate, RideStatusUpdate, RideSearchRequest,
-    BookingCreate, BookingStatusUpdate, BookingStartRequest, BookingRateRequest
+    BookingCreate, RelayBookingCreate, BookingStatusUpdate, BookingStartRequest, BookingRateRequest,
+    ParcelCreate, ParcelAcceptRequest, ParcelOTPVerify
 )
 from rides import (
-    create_ride_tables, ensure_public_id, publish_ride, get_live_rides, get_ride,
+    create_ride_tables, ensure_public_id, publish_ride, get_live_rides, get_nearby_rides, get_ride,
     get_rides_by_rider, update_ride_location, update_ride_status,
     create_booking, get_bookings_for_passenger, get_bookings_for_rider,
     get_booking, update_booking_status, start_booking_with_otp, complete_booking,
     pay_booking, rate_booking, get_user_reviews
 )
+from parcels import (
+    create_parcels_table, create_parcel, get_parcels_by_sender, get_parcels_for_rider,
+    get_nearby_parcels_for_ride, accept_parcel, verify_parcel_pickup, verify_parcel_delivery, cancel_parcel
+)
 from matching import rank_rides, ride_distance_m, VEHICLE_DEFAULT_RATE
 from datetime import datetime, timedelta
-from route_engine import overlap_score, route_length, calculate_detour, calculate_overlap_score
+from route_engine import overlap_score, route_length, calculate_detour, calculate_overlap_score, detect_route_deviation
+from cost_sharing import calculate_cost_split
+from payment_gateway import PaymentGateway
 from ai_engine import (
-    calculate_trust_score, classify_risk_level, estimate_carbon_savings,
+    calculate_trust_score, estimate_carbon_savings,
     classify_trust_risk_level, get_ai_recommendation, generate_risk_reasons
 )
-from compliance import is_package_allowed, calculate_cost_share, enforce_earnings_cap
+
+from notifications import (
+    create_notifications_table, get_user_notifications,
+    mark_notification_read, mark_all_notifications_read, delete_notification,
+    clear_user_notifications, create_notification
+)
+from sos import (
+    create_sos_tables, trigger_sos, update_emergency_contact,
+    resolve_sos, get_user_sos_alerts
+)
 
 # In-memory OTP store: { phone: {code, expires} }
 _otp_store: dict = {}
@@ -106,7 +128,7 @@ app.add_middleware(
         *_extra_origins,
     ],
     # Local dev on any port, plus Vercel preview and production deployments.
-    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1):\d+|https://.*\.vercel\.app)$",
+    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+):\d+|https://.*\.vercel\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -128,11 +150,52 @@ async def global_exception_handler(request: Request, exc: Exception):
 def startup_event():
     create_tables()
     create_ride_tables()
+    create_notifications_table()
+    create_sos_tables()
+    create_parcels_table()
 
 
 @app.get("/", response_model=dict)
 def home():
     return {"message": "AI Ride Sharing backend is running"}
+
+
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: int):
+    """Real-Time WebSocket Manager endpoint for live chat and notifications."""
+    await manager.connect(user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            # Handle incoming WebSocket chat message
+            if data.get("type") == "chat_message":
+                booking_id = data.get("booking_id")
+                sender_id = data.get("sender_id", user_id)
+                sender_name = data.get("sender_name", "Commuter")
+                message_text = str(data.get("message", "")).strip()
+
+                if booking_id and message_text:
+                    from models import create_chat_message
+                    from rides import get_booking
+                    saved_msg = create_chat_message(booking_id, sender_id, sender_name, message_text)
+                    booking = get_booking(booking_id)
+                    if booking:
+                        payload = {
+                            "type": "chat_message",
+                            "booking_id": booking_id,
+                            "message": saved_msg
+                        }
+                        if booking.get("passenger_id"):
+                            await manager.broadcast_to_user(booking["passenger_id"], payload)
+                        if booking.get("rider_id"):
+                            await manager.broadcast_to_user(booking["rider_id"], payload)
+            elif data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        manager.disconnect(user_id, websocket)
+    except Exception as e:
+        print(f"[WebSocket] Error for user {user_id}: {e}")
+        manager.disconnect(user_id, websocket)
 
 
 @app.get("/users/register")
@@ -160,10 +223,15 @@ def register_user(user: UserCreate):
         new_user = create_user(user_data)
         # Every account gets a stable, shareable ID such as AR-000042.
         new_user["public_id"] = ensure_public_id(new_user["id"])
-        # Return safe dict — never expose password_hash, convert date→str
+        token = create_access_token({"sub": str(new_user["id"]), "email": new_user.get("email"), "id": new_user["id"]})
+        # Return safe dict — never expose password_hash
         safe = {k: (str(v) if hasattr(v, 'isoformat') else v)
                 for k, v in new_user.items() if k != "password_hash"}
-        return JSONResponse(content=safe)
+        safe["token"] = token
+        safe["access_token"] = token
+        return JSONResponse(content=jsonable_encoder(safe))
+    except psycopg2.errors.UniqueViolation as e:
+        raise HTTPException(status_code=400, detail="An account with this email or Government ID already exists.")
     except psycopg2.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
@@ -172,31 +240,56 @@ def register_user(user: UserCreate):
 
 @app.post("/auth/send-otp")
 def send_otp(req: OTPRequest):
-    """Generate a 6-digit OTP and send via Twilio SMS (or demo mode if not configured)."""
-    code = str(random.randint(100000, 999999))
-    _otp_store[req.phone] = {"code": code, "expires": time.time() + 300}  # 5 min TTL
+    """Generate a 6-digit OTP and send via Twilio Real SMS (or demo mode fallback)."""
+    to_phone = req.phone.strip()
+    if not to_phone.startswith("+"):
+        clean = re.sub(r"\D", "", to_phone)
+        to_phone = f"+91{clean}" if len(clean) == 10 else f"+{clean}"
 
-    if _twilio_ready:
+    if _twilio_ready and TWILIO_VERIFY_SID:
+        try:
+            v = _twilio.verify.v2.services(TWILIO_VERIFY_SID).verifications.create(to=to_phone, channel='sms')
+            print(f"[Twilio Verify API] Real SMS sent to {to_phone} (status: {v.status})")
+            return {"message": f"Real SMS OTP sent to {to_phone}"}
+        except Exception as e:
+            print(f"[Twilio Verify API] Failed: {e}")
+
+    code = str(random.randint(100000, 999999))
+    _otp_store[req.phone] = {"code": code, "expires": time.time() + 300}
+    _otp_store[to_phone] = {"code": code, "expires": time.time() + 300}
+
+    if _twilio_ready and TWILIO_FROM and not TWILIO_FROM.startswith("+1XXXXX"):
         try:
             _twilio.messages.create(
-                body=f"Your AIRide verification code is: {code}. Valid for 5 minutes. Do not share this code.",
+                body=f"Your AIRide verification code is: {code}. Valid for 5 minutes.",
                 from_=TWILIO_FROM,
-                to=req.phone
+                to=to_phone
             )
-            print(f"[Twilio] SMS sent to {req.phone}")
-            return {"message": "OTP sent via SMS"}
+            print(f"[Twilio Messages API] Real SMS sent to {to_phone}")
+            return {"message": f"OTP sent via real SMS to {to_phone}"}
         except Exception as e:
-            print(f"[Twilio] SMS failed: {e}")
-            # Fall through to demo mode so user still sees code
+            print(f"[Twilio Messages API] Failed: {e}")
             return {"message": "SMS delivery failed — use demo code", "dev_code": code, "error": str(e)}
-    else:
-        # Demo mode — return code in response so it shows on screen
-        return {"message": "OTP sent (demo)", "dev_code": code}
+
+    return {"message": "OTP sent (demo)", "dev_code": code}
 
 
 @app.post("/auth/verify-otp")
 def verify_otp(req: OTPVerify):
-    entry = _otp_store.get(req.phone)
+    to_phone = req.phone.strip()
+    if not to_phone.startswith("+"):
+        clean = re.sub(r"\D", "", to_phone)
+        to_phone = f"+91{clean}" if len(clean) == 10 else f"+{clean}"
+
+    if _twilio_ready and TWILIO_VERIFY_SID:
+        try:
+            vc = _twilio.verify.v2.services(TWILIO_VERIFY_SID).verification_checks.create(to=to_phone, code=req.code)
+            if vc.status == "approved":
+                return {"verified": True}
+        except Exception as e:
+            print(f"[Twilio Verify Check] Failed: {e}")
+
+    entry = _otp_store.get(req.phone) or _otp_store.get(to_phone)
     if not entry:
         raise HTTPException(status_code=400, detail="No OTP sent to this number. Request a new code.")
     if time.time() > entry["expires"]:
@@ -204,7 +297,6 @@ def verify_otp(req: OTPVerify):
         raise HTTPException(status_code=400, detail="OTP expired. Please request a new code.")
     if entry["code"] != req.code:
         raise HTTPException(status_code=400, detail="Incorrect code. Please try again.")
-    del _otp_store[req.phone]
     return {"verified": True}
 
 
@@ -220,8 +312,11 @@ def login(req: LoginRequest):
     # Return user without password hash
     user.pop("password_hash", None)
     user["public_id"] = ensure_public_id(user["id"])
+    token = create_access_token({"sub": str(user["id"]), "email": user.get("email"), "id": user["id"]})
     safe = {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()}
-    return safe
+    safe["token"] = token
+    safe["access_token"] = token
+    return jsonable_encoder(safe)
 
 
 @app.get("/users/{user_id}")
@@ -231,228 +326,11 @@ def get_user_profile(user_id: int):
         raise HTTPException(status_code=404, detail="User not found")
     user.pop("password_hash", None)
     user["public_id"] = ensure_public_id(user_id)
-    return {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()}
+    return jsonable_encoder({k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()})
 
 
 
-def perform_matchmaking(
-    user_id: int,
-    origin: str,
-    destination: str,
-    polyline: list,
-    departure_time: datetime,
-    max_wait_minutes: int,
-    package_weight_kg: float,
-    package_category: str,
-    route_type: str,
-    package_size: str,
-    overlap_threshold: Optional[float] = None
-) -> list[MatchCandidate]:
-    # Determine search threshold
-    threshold = overlap_threshold if overlap_threshold is not None else float(os.getenv("OVERLAP_THRESHOLD", 0.70))
-    
-    # We query all routes in the radius. We'll search with 1000m to capture wider detours if any, or default 500m
-    nearby_routes = get_routes_near_route(polyline, search_radius_m=1000)
-    candidates = []
-    
-    for item in nearby_routes:
-        # Avoid matching with self
-        if item.get("user_id") == user_id:
-            continue
-            
-        # Avoid matching same role (traveler with traveler, parcel with parcel)
-        item_type = item.get("route_type", "traveler")
-        if item_type == route_type:
-            continue
-            
-        # Time window matching filter
-        if not check_time_overlap(departure_time, max_wait_minutes, item["departure_time"], item.get("max_wait_minutes", 15)):
-            continue
-            
-        # Assign traveler and parcel polylines
-        if route_type == "parcel":
-            parcel_polyline = polyline
-            traveler_polyline = item["polyline"]
-            traveler_user_id = item["user_id"]
-            
-            traveler_weight_capacity = item.get("package_weight_kg", 0.0)
-            traveler_size_capacity = item.get("package_size", "medium")
-            parcel_weight = package_weight_kg
-            parcel_size = package_size
-        else:
-            parcel_polyline = item["polyline"]
-            traveler_polyline = polyline
-            traveler_user_id = user_id
-            
-            traveler_weight_capacity = package_weight_kg
-            traveler_size_capacity = package_size
-            parcel_weight = item.get("package_weight_kg", 0.0)
-            parcel_size = item.get("package_size", "medium")
-            
-        # Capacity constraints
-        size_ranks = {"small": 1, "medium": 2, "large": 3}
-        t_size_rank = size_ranks.get(str(traveler_size_capacity).lower(), 2)
-        p_size_rank = size_ranks.get(str(parcel_size).lower(), 2)
-        
-        if traveler_weight_capacity < parcel_weight:
-            continue
-        if t_size_rank < p_size_rank:
-            continue
-            
-        # Calculate overlap score
-        score = calculate_overlap_score(traveler_polyline, parcel_polyline, threshold_m=120.0)
-        if score < threshold:
-            continue
-            
-        # Detour calculation
-        detour = calculate_detour(traveler_polyline, parcel_polyline)
-        
-        # Traveler trust information
-        t_user = get_user(traveler_user_id)
-        if t_user:
-            t_score = t_user.get("trust_score", 50)
-            t_success_rate = t_user.get("delivery_success_rate", 0.0)
-            
-            if t_success_rate <= 1.0:
-                t_success_rate = t_success_rate * 100.0
-                
-            risk_level = classify_trust_risk_level(t_score)
-            ai_rec = get_ai_recommendation(t_score)
-            risk_reason = generate_risk_reasons(
-                face_verified=t_user.get("face_verified", False),
-                rating=t_user.get("rating", 0.0),
-                completed_deliveries=t_user.get("completed_deliveries", 0),
-                cancellation_count=t_user.get("cancellation_count", 0),
-                route_deviation_count=t_user.get("route_deviation_count", 0),
-                report_count=t_user.get("report_count", 0),
-                response_time_minutes=t_user.get("response_time_minutes", 10.0),
-            )
-        else:
-            t_score = 50
-            t_success_rate = 0.0
-            risk_level = "Medium Risk"
-            ai_rec = "Recommended"
-            risk_reason = "Traveler profile not found"
-            
-        shared_distance = score * route_length(parcel_polyline)
-        base_cost = calculate_cost_share(1.2, shared_distance, route_length(parcel_polyline))
-        candidate_cost = enforce_earnings_cap(base_cost)
-        carbon_savings = estimate_carbon_savings(shared_distance, route_length(parcel_polyline))
-        
-        candidates.append(
-            MatchCandidate(
-                route_id=item["id"],
-                user_id=item["user_id"],
-                origin=item["origin"],
-                destination=item["destination"],
-                overlap_score=round(score, 3),
-                trust_score=t_score,
-                risk_level=risk_level,
-                estimated_cost_share=candidate_cost,
-                carbon_savings_kg=round(carbon_savings, 2),
-                departure_time=item["departure_time"],
-                match_percentage=round(score * 100, 1),
-                shared_route_distance_m=round(shared_distance, 1),
-                detour_m=round(detour, 1),
-                estimated_delivery_success=round(t_success_rate, 1),
-                ai_recommendation=ai_rec,
-                risk_reason=risk_reason
-            )
-        )
-        
-    # Sort and rank candidates
-    candidates.sort(key=lambda x: (
-        -x.overlap_score,
-        x.detour_m,
-        x.departure_time,
-        -x.trust_score
-    ))
-    
-    return candidates
 
-
-@app.post("/routes", response_model=RouteResponse)
-def create_route_entry(route: RouteCreate):
-    if route.route_type == "parcel":
-        if not is_package_allowed(route.package_weight_kg, route.package_category):
-            raise HTTPException(status_code=400, detail="Package exceeds allowed weight or category restrictions.")
-
-    polyline = [point.dict() for point in route.polyline]
-    total_distance_m = route_length(polyline)
-    route_data = route.dict()
-    route_data["polyline"] = polyline
-    route_data["total_distance_m"] = total_distance_m
-    new_route = create_route(route_data)
-    return new_route
-
-
-@app.post("/routes/submit", response_model=MatchResponse)
-def submit_route_and_match(route: RouteCreate):
-    user = get_user(route.user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    if not user.get("face_verified") or not user.get("government_id"):
-        # Auto-verify the user to prevent demo/testing blocks
-        from models import recalculate_user_trust, get_connection
-        conn = get_connection()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE users SET face_verified = TRUE, government_id = COALESCE(government_id, %s) WHERE id = %s",
-                    (f"AUTO-{int(time.time())}", route.user_id)
-                )
-                conn.commit()
-            recalculate_user_trust(route.user_id)
-            user = get_user(route.user_id)
-        except Exception as db_err:
-            conn.rollback()
-            raise HTTPException(status_code=500, detail=f"Database error during auto-verification: {db_err}")
-
-    if route.route_type == "parcel":
-        if not is_package_allowed(route.package_weight_kg, route.package_category):
-            raise HTTPException(status_code=400, detail="Package exceeds allowed weight or category restrictions.")
-
-    polyline = [point.dict() for point in route.polyline]
-    total_distance_m = route_length(polyline)
-    route_data = route.dict()
-    route_data["polyline"] = polyline
-    route_data["total_distance_m"] = total_distance_m
-    new_route = create_route(route_data)
-
-    candidates = perform_matchmaking(
-        user_id=route.user_id,
-        origin=route.origin,
-        destination=route.destination,
-        polyline=polyline,
-        departure_time=route.departure_time,
-        max_wait_minutes=route.max_wait_minutes,
-        package_weight_kg=route.package_weight_kg,
-        package_category=route.package_category,
-        route_type=route.route_type or "traveler",
-        package_size=route.package_size or "medium",
-        overlap_threshold=route.overlap_threshold
-    )
-
-    return MatchResponse(matches=candidates)
-
-
-@app.post("/matches/search", response_model=MatchResponse)
-def search_matches(request: MatchRequest):
-    polyline = [point.dict() for point in request.polyline]
-    candidates = perform_matchmaking(
-        user_id=0,
-        origin="Generic Origin",
-        destination="Generic Destination",
-        polyline=polyline,
-        departure_time=request.departure_time,
-        max_wait_minutes=request.max_wait_minutes,
-        package_weight_kg=request.package_weight_kg,
-        package_category=request.package_category,
-        route_type=request.route_type or "parcel",
-        package_size=request.package_size or "medium",
-        overlap_threshold=request.overlap_threshold
-    )
-    return MatchResponse(matches=candidates)
 
 
 @app.get("/users/trust-score/{user_id}")
@@ -628,6 +506,17 @@ def list_live_rides():
     return {"rides": rides, "count": len(rides)}
 
 
+@app.get("/rides/nearby")
+def list_nearby_rides(lat: float, lng: float, radius_m: float = 5000.0, limit: int = 50):
+    """Find available riders near a given lat/lng within radius_m meters."""
+    rides = get_nearby_rides(lat, lng, radius_m, limit)
+    for ride in rides:
+        trust = ride.get("rider_trust_score") or 50
+        ride["risk_level"] = classify_trust_risk_level(trust)
+        ride["ai_recommendation"] = get_ai_recommendation(trust)
+    return {"rides": rides, "count": len(rides), "radius_m": radius_m}
+
+
 @app.get("/rides/rider/{rider_id}")
 def list_rider_rides(rider_id: int):
     return {"rides": get_rides_by_rider(rider_id)}
@@ -646,7 +535,70 @@ def push_ride_location(ride_id: int, req: RideLocationUpdate):
     ride = update_ride_location(ride_id, req.latitude, req.longitude)
     if not ride:
         raise HTTPException(status_code=404, detail="Ride not found.")
+
+    # Check for route deviation
+    polyline = ride.get("polyline") or []
+    deviation_info = detect_route_deviation((req.latitude, req.longitude), polyline, threshold_m=500.0)
+
+    if deviation_info["is_deviated"]:
+        # Increment rider's route deviation count and recalculate trust
+        rider_id = ride["rider_id"]
+        conn = get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE users SET route_deviation_count = route_deviation_count + 1 WHERE id = %s;",
+                    (rider_id,)
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        recalculate_user_trust(rider_id)
+
+    ride["route_deviation"] = deviation_info
     return ride
+
+
+@app.get("/rides/{ride_id}/cost-split")
+def get_ride_cost_split(ride_id: int, shared_distance_m: Optional[float] = None):
+    ride = get_ride(ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found.")
+
+    dist = shared_distance_m or ride.get("total_distance_m", 0.0)
+    split = calculate_cost_split(
+        shared_distance_m=dist,
+        total_ride_distance_m=ride.get("total_distance_m", 0.0),
+        fare_per_km=ride.get("fare_per_km", 6.0),
+        seats=ride.get("seats_available", 1),
+        vehicle_type=ride.get("vehicle_type", "car")
+    )
+    return split
+
+
+@app.post("/payments/create-session")
+def create_payment_session_endpoint(payload: dict):
+    user_id = payload.get("user_id")
+    amount = float(payload.get("amount", 0.0))
+    payment_method = payload.get("payment_method", "upi")
+    if not user_id or amount <= 0:
+        raise HTTPException(status_code=400, detail="user_id and positive amount are required.")
+
+    session = PaymentGateway.create_checkout_session(user_id, amount, payment_method)
+    return session
+
+
+@app.post("/payments/verify")
+def verify_payment_session_endpoint(payload: dict):
+    session_id = payload.get("session_id")
+    transaction_ref = payload.get("transaction_ref")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+
+    success, session, message = PaymentGateway.verify_and_process_payment(session_id, transaction_ref)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"success": True, "message": message, "session": session}
 
 
 @app.post("/rides/{ride_id}/status")
@@ -666,9 +618,23 @@ def set_ride_status(ride_id: int, req: RideStatusUpdate):
 def search_rides(req: RideSearchRequest):
     """Find published rides that pass the passenger's pickup and drop, in order."""
     rides = get_live_rides()
+    passenger_gender = "unspecified"
     if req.passenger_id:
-        # You cannot ride along with yourself.
-        rides = [ride for ride in rides if ride["rider_id"] != req.passenger_id]
+        passenger = get_user(req.passenger_id)
+        if passenger:
+            passenger_gender = (passenger.get("gender") or "unspecified").lower()
+
+    filtered = []
+    for ride in rides:
+        if req.passenger_id and ride.get("rider_id") == req.passenger_id:
+            continue
+        is_women_only = bool(ride.get("women_only", False))
+        if is_women_only and passenger_gender != "female":
+            continue
+        if req.women_only_filter and not is_women_only:
+            continue
+        filtered.append(ride)
+    rides = filtered
     matches = rank_rides(
         rides,
         pickup=(req.pickup_lat, req.pickup_lng),
@@ -678,12 +644,22 @@ def search_rides(req: RideSearchRequest):
         min_overlap=req.min_overlap,
     )
     for match in matches:
-        trust = match.get("rider_trust_score") or 50
-        match["risk_level"] = classify_trust_risk_level(trust)
-        match["ai_recommendation"] = get_ai_recommendation(trust)
-        match["carbon_savings_kg"] = round(
-            estimate_carbon_savings(match["shared_distance_m"], match["passenger_distance_m"]), 3
-        )
+        if match.get("is_relay"):
+            trust1 = match["leg1"].get("rider_trust_score") or 50
+            trust2 = match["leg2"].get("rider_trust_score") or 50
+            trust = min(trust1, trust2)
+            match["risk_level"] = classify_trust_risk_level(trust)
+            match["ai_recommendation"] = f"🔀 Multi-leg relay option via {match['transfer_point']['name']}."
+            match["carbon_savings_kg"] = round(
+                estimate_carbon_savings(match["shared_distance_m"], match["passenger_distance_m"]), 3
+            )
+        else:
+            trust = match.get("rider_trust_score") or 50
+            match["risk_level"] = classify_trust_risk_level(trust)
+            match["ai_recommendation"] = get_ai_recommendation(trust)
+            match["carbon_savings_kg"] = round(
+                estimate_carbon_savings(match["shared_distance_m"], match["passenger_distance_m"]), 3
+            )
     return {"matches": matches, "count": len(matches)}
 
 
@@ -721,6 +697,72 @@ def book_ride(req: BookingCreate):
     return get_booking(booking["id"])
 
 
+@app.post("/bookings/relay")
+def book_relay_ride(req: RelayBookingCreate):
+    passenger = get_user(req.passenger_id)
+    if not passenger:
+        raise HTTPException(status_code=404, detail="Passenger not found.")
+
+    ride1 = get_ride(req.leg1_ride_id)
+    ride2 = get_ride(req.leg2_ride_id)
+    if not ride1 or not ride2:
+        raise HTTPException(status_code=404, detail="One or both rides not found.")
+
+    b1_data = {
+        "ride_id": req.leg1_ride_id,
+        "passenger_id": req.passenger_id,
+        "pickup": req.pickup,
+        "dropoff": f"Transfer: {req.transfer_point}",
+        "pickup_lat": req.pickup_lat,
+        "pickup_lng": req.pickup_lng,
+        "drop_lat": req.transfer_lat,
+        "drop_lng": req.transfer_lng,
+        "seats": req.seats,
+    }
+
+    b2_data = {
+        "ride_id": req.leg2_ride_id,
+        "passenger_id": req.passenger_id,
+        "pickup": f"Transfer: {req.transfer_point}",
+        "dropoff": req.dropoff,
+        "pickup_lat": req.transfer_lat,
+        "pickup_lng": req.transfer_lng,
+        "drop_lat": req.drop_lat,
+        "drop_lng": req.drop_lng,
+        "seats": req.seats,
+    }
+
+    from matching import match_ride
+    score1 = match_ride(ride1, (req.pickup_lat, req.pickup_lng), (req.transfer_lat, req.transfer_lng), max_detour_m=req.max_detour_m, min_overlap=0.0)
+    score2 = match_ride(ride2, (req.transfer_lat, req.transfer_lng), (req.drop_lat, req.drop_lng), max_detour_m=req.max_detour_m, min_overlap=0.0)
+
+    b1_data["fare"] = round((score1["fare"] if score1 else 30.0) * req.seats, 2)
+    b1_data["overlap_score"] = score1["overlap_score"] if score1 else 0.5
+    b1_data["detour_m"] = score1["detour_m"] if score1 else 0.0
+
+    b2_data["fare"] = round((score2["fare"] if score2 else 30.0) * req.seats, 2)
+    b2_data["overlap_score"] = score2["overlap_score"] if score2 else 0.5
+    b2_data["detour_m"] = score2["detour_m"] if score2 else 0.0
+
+    b1 = create_booking(b1_data)
+    b2 = create_booking(b2_data)
+
+    if not b1 or not b2:
+        raise HTTPException(status_code=400, detail="Could not book seats on relay rides.")
+
+    booking1 = get_booking(b1["id"])
+    booking2 = get_booking(b2["id"])
+
+    return {
+        "is_relay": True,
+        "id": booking1["id"],
+        "leg1": booking1,
+        "leg2": booking2,
+        "otp": f"{booking1['otp']} & {booking2['otp']}",
+    }
+
+
+
 @app.get("/bookings/passenger/{passenger_id}")
 def list_passenger_bookings(passenger_id: int):
     return {"bookings": get_bookings_for_passenger(passenger_id)}
@@ -741,6 +783,42 @@ def read_booking(booking_id: int):
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
     return booking
+
+
+@app.get("/bookings/{booking_id}/chat")
+def get_chat_history(booking_id: int):
+    from models import get_trip_chat_messages
+    return {"messages": get_trip_chat_messages(booking_id)}
+
+
+@app.post("/bookings/{booking_id}/chat")
+async def send_chat_message(booking_id: int, req: dict):
+    from models import create_chat_message
+    sender_id = req.get("sender_id")
+    sender_name = req.get("sender_name", "Commuter")
+    message_text = str(req.get("message", "")).strip()
+
+    if not sender_id or not message_text:
+        raise HTTPException(status_code=400, detail="sender_id and message are required.")
+
+    booking = get_booking(booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+
+    saved_msg = create_chat_message(booking_id, sender_id, sender_name, message_text)
+
+    # Broadcast live chat message via WebSockets
+    payload = {
+        "type": "chat_message",
+        "booking_id": booking_id,
+        "message": saved_msg
+    }
+    if booking.get("passenger_id"):
+        asyncio.create_task(manager.broadcast_to_user(booking["passenger_id"], payload))
+    if booking.get("rider_id"):
+        asyncio.create_task(manager.broadcast_to_user(booking["rider_id"], payload))
+
+    return saved_msg
 
 
 @app.post("/bookings/{booking_id}/status")
@@ -792,3 +870,207 @@ def rate_trip(booking_id: int, req: BookingRateRequest):
 @app.get("/users/{user_id}/reviews")
 def list_user_reviews(user_id: int):
     return {"reviews": get_user_reviews(user_id)}
+
+
+# ── Real-Time WebSocket endpoint ───────────────────────────────────────────
+
+@app.websocket("/ws/notifications/{user_id}")
+async def websocket_notifications(websocket: WebSocket, user_id: int):
+    await manager.connect(user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        manager.disconnect(user_id, websocket)
+    except Exception as e:
+        manager.disconnect(user_id, websocket)
+
+
+# ── Notification endpoints ───────────────────────────────────────────────
+
+@app.get("/notifications/{user_id}")
+def fetch_user_notifications(user_id: int, category: Optional[str] = None, limit: int = 100):
+    notes = get_user_notifications(user_id, category=category, limit=limit)
+    all_notes = get_user_notifications(user_id, category=None, limit=200)
+    unread_count = sum(1 for n in all_notes if not n.get("is_read"))
+    return {
+        "notifications": notes,
+        "count": len(notes),
+        "unread_count": unread_count,
+        "category": category or "all"
+    }
+
+
+@app.post("/notifications/create")
+def create_notification_endpoint(payload: dict):
+    user_id = payload.get("user_id")
+    event_type = payload.get("event_type", "system")
+    title = payload.get("title", "Notification")
+    message = payload.get("message", "")
+    category = payload.get("category")
+    booking_id = payload.get("booking_id")
+    ride_id = payload.get("ride_id")
+
+    if not user_id or not title or not message:
+        raise HTTPException(status_code=400, detail="user_id, title, and message are required.")
+
+    note = create_notification(
+        user_id=int(user_id),
+        event_type=event_type,
+        title=title,
+        message=message,
+        category=category,
+        booking_id=int(booking_id) if booking_id else None,
+        ride_id=int(ride_id) if ride_id else None
+    )
+    if not note:
+        raise HTTPException(status_code=500, detail="Failed to create notification.")
+    return note
+
+
+@app.post("/notifications/{notification_id}/read")
+def read_notification_endpoint(notification_id: int):
+    success = mark_notification_read(notification_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to mark notification as read.")
+    return {"success": True}
+
+
+@app.post("/notifications/read-all/{user_id}")
+def read_all_notifications_endpoint(user_id: int):
+    success = mark_all_notifications_read(user_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to mark all notifications as read.")
+    return {"success": True}
+
+
+@app.delete("/notifications/{notification_id}")
+def delete_notification_endpoint(notification_id: int):
+    success = delete_notification(notification_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete notification.")
+    return {"success": True}
+
+
+@app.post("/notifications/clear/{user_id}")
+@app.delete("/notifications/clear/{user_id}")
+def clear_notifications_endpoint(user_id: int):
+    success = clear_user_notifications(user_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to clear notifications.")
+    return {"success": True}
+
+
+# ── SOS Emergency Alert endpoints ────────────────────────────────────────
+
+@app.post("/sos/trigger")
+def trigger_sos_endpoint(payload: dict):
+    user_id = payload.get("user_id")
+    lat = payload.get("latitude")
+    lng = payload.get("longitude")
+    booking_id = payload.get("booking_id")
+    location_name = payload.get("location_name")
+
+    if not user_id or lat is None or lng is None:
+        raise HTTPException(status_code=400, detail="user_id, latitude, and longitude are required.")
+
+    result = trigger_sos(
+        user_id=int(user_id),
+        latitude=float(lat),
+        longitude=float(lng),
+        booking_id=int(booking_id) if booking_id else None,
+        location_name=location_name
+    )
+    return result
+
+
+@app.post("/sos/contact")
+def update_contact_endpoint(payload: dict):
+    user_id = payload.get("user_id")
+    name = payload.get("name")
+    phone = payload.get("phone")
+
+    if not user_id or not name or not phone:
+        raise HTTPException(status_code=400, detail="user_id, name, and phone are required.")
+
+    updated = update_emergency_contact(int(user_id), name.strip(), phone.strip())
+    if not updated:
+        raise HTTPException(status_code=400, detail="Failed to update emergency contact.")
+    return updated
+
+
+@app.get("/sos/alerts/{user_id}")
+def get_user_sos_history(user_id: int):
+    alerts = get_user_sos_alerts(user_id)
+    return {"alerts": alerts, "count": len(alerts)}
+
+
+@app.post("/sos/{alert_id}/resolve")
+def resolve_sos_endpoint(alert_id: int):
+    success = resolve_sos(alert_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to resolve SOS alert.")
+    return {"success": True}
+
+
+# ── Parcel Sharing endpoints ─────────────────────────────────────────────
+
+@app.post("/parcels/create")
+def create_parcel_endpoint(req: ParcelCreate):
+    parcel, error = create_parcel(req.dict())
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return parcel
+
+
+@app.get("/parcels/sender/{sender_id}")
+def get_sender_parcels_endpoint(sender_id: int):
+    return {"parcels": get_parcels_by_sender(sender_id)}
+
+
+@app.get("/parcels/rider/{rider_id}")
+def get_rider_parcels_endpoint(rider_id: int):
+    return {"parcels": get_parcels_for_rider(rider_id)}
+
+
+@app.get("/parcels/nearby/{ride_id}")
+def get_nearby_parcels_endpoint(ride_id: int, max_detour_m: float = 3000.0):
+    parcels = get_nearby_parcels_for_ride(ride_id, max_detour_m)
+    return {"parcels": parcels, "count": len(parcels)}
+
+
+@app.post("/parcels/{parcel_id}/accept")
+def accept_parcel_endpoint(parcel_id: int, req: ParcelAcceptRequest):
+    parcel, error = accept_parcel(parcel_id, req.rider_id, req.ride_id)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return parcel
+
+
+@app.post("/parcels/{parcel_id}/verify-pickup")
+def verify_pickup_endpoint(parcel_id: int, req: ParcelOTPVerify):
+    parcel, error = verify_parcel_pickup(parcel_id, req.otp)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return parcel
+
+
+@app.post("/parcels/{parcel_id}/verify-delivery")
+def verify_delivery_endpoint(parcel_id: int, req: ParcelOTPVerify):
+    parcel, error = verify_parcel_delivery(parcel_id, req.otp)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return parcel
+
+
+@app.post("/parcels/{parcel_id}/cancel")
+def cancel_parcel_endpoint(parcel_id: int, payload: dict):
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required.")
+    parcel, error = cancel_parcel(parcel_id, int(user_id))
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return parcel

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     route_deviation_count INTEGER DEFAULT 0,
     report_count INTEGER DEFAULT 0,
     response_time_minutes REAL DEFAULT 10.0,
+    gender TEXT DEFAULT 'unspecified',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 """
@@ -107,6 +108,9 @@ def create_tables():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS response_time_minutes REAL DEFAULT 10.0;",
             "ALTER TABLE routes ADD COLUMN IF NOT EXISTS route_type TEXT DEFAULT 'traveler';",
             "ALTER TABLE routes ADD COLUMN IF NOT EXISTS package_size TEXT DEFAULT 'medium';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT 'unspecified';",
         ]
         for migration in migrations:
             try:
@@ -117,6 +121,38 @@ def create_tables():
             cursor.execute("ALTER TABLE routes ADD COLUMN IF NOT EXISTS route_geom GEOGRAPHY(LINESTRING, 4326);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_routes_geom ON routes USING GIST (route_geom);")
     conn.close()
+    seed_demo_data()
+
+
+def seed_demo_data():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE email = %s", ("praveen.test@example.com",))
+            if not cursor.fetchone():
+                import hashlib, os
+                salt = os.urandom(16).hex()
+                pw_hash = f"{salt}:" + hashlib.sha256((salt + "demo1234").encode()).hexdigest()
+                cursor.execute("""
+                    INSERT INTO users (name, email, government_id, face_verified, rating, trust_score, password_hash, phone, wallet_balance)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, ("Praveen (Passenger)", "praveen.test@example.com", "DEMO-PASS-001", True, 4.8, 85, pw_hash, "+919876543210", 500.0))
+            
+            cursor.execute("SELECT id FROM users WHERE email = %s", ("anusha@example.com",))
+            if not cursor.fetchone():
+                import hashlib, os
+                salt = os.urandom(16).hex()
+                pw_hash = f"{salt}:" + hashlib.sha256((salt + "demo1234").encode()).hexdigest()
+                cursor.execute("""
+                    INSERT INTO users (name, email, government_id, face_verified, rating, trust_score, password_hash, phone, wallet_balance)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, ("Anusha (Rider)", "anusha@example.com", "DEMO-RIDER-002", True, 4.9, 90, pw_hash, "+919876543211", 500.0))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+    finally:
+        conn.close()
+
 
 
 
@@ -130,9 +166,9 @@ def create_user(user_data: dict) -> dict:
                     name, email, government_id, face_verified, rating,
                     delivery_success_rate, cancellation_count, trust_score,
                     password_hash, dob, title, phone, completed_deliveries,
-                    route_deviation_count, report_count, response_time_minutes
+                    route_deviation_count, report_count, response_time_minutes, gender
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (government_id) DO UPDATE
                     SET name                  = EXCLUDED.name,
                         email                 = EXCLUDED.email,
@@ -148,7 +184,8 @@ def create_user(user_data: dict) -> dict:
                         completed_deliveries  = EXCLUDED.completed_deliveries,
                         route_deviation_count = EXCLUDED.route_deviation_count,
                         report_count          = EXCLUDED.report_count,
-                        response_time_minutes = EXCLUDED.response_time_minutes
+                        response_time_minutes = EXCLUDED.response_time_minutes,
+                        gender                = COALESCE(EXCLUDED.gender, users.gender)
                 RETURNING *;
                 """,
                 (
@@ -168,6 +205,7 @@ def create_user(user_data: dict) -> dict:
                     user_data.get("route_deviation_count", 0),
                     user_data.get("report_count", 0),
                     user_data.get("response_time_minutes", 10.0),
+                    user_data.get("gender", "unspecified"),
                 ),
             )
             user = cursor.fetchone()
@@ -454,3 +492,49 @@ def recalculate_user_trust(user_id: int) -> dict | None:
     conn.commit()
     conn.close()
     return dict(updated_user) if updated_user else None
+
+
+CREATE_CHAT_TABLE = """
+CREATE TABLE IF NOT EXISTS trip_chat_messages (
+    id SERIAL PRIMARY KEY,
+    booking_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    sender_name TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_chat_booking_id ON trip_chat_messages(booking_id);
+"""
+
+def create_chat_table():
+    conn = get_connection()
+    conn.autocommit = True
+    with conn.cursor() as cursor:
+        cursor.execute(CREATE_CHAT_TABLE)
+    conn.close()
+
+def create_chat_message(booking_id: int, sender_id: int, sender_name: str, message: str) -> dict:
+    create_chat_table()
+    conn = get_connection()
+    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+        cursor.execute(
+            """INSERT INTO trip_chat_messages (booking_id, sender_id, sender_name, message)
+               VALUES (%s, %s, %s, %s) RETURNING *;""",
+            (booking_id, sender_id, sender_name, message)
+        )
+        msg = cursor.fetchone()
+    conn.commit()
+    conn.close()
+    return dict(msg) if msg else {}
+
+def get_trip_chat_messages(booking_id: int) -> list[dict]:
+    create_chat_table()
+    conn = get_connection()
+    with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+        cursor.execute(
+            "SELECT * FROM trip_chat_messages WHERE booking_id = %s ORDER BY created_at ASC;",
+            (booking_id,)
+        )
+        rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

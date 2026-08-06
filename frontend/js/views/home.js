@@ -24,7 +24,7 @@ export default function homeView(container) {
         <button class="btn btn-ghost" data-go="/profile">${icon('user', 16)} My profile</button>
       </div>
 
-      <div class="grid grid-2" style="margin-bottom:var(--space-6)">
+      <div class="grid grid-3" style="margin-bottom:var(--space-6)">
         <button class="portal-card" data-go="/rider">
           <span class="portal-icon">${icon('car', 24)}</span>
           <h3>Rider portal</h3>
@@ -36,6 +36,12 @@ export default function homeView(container) {
           <h3>Passenger portal</h3>
           <p class="small">Find travellers whose route already covers your pickup and drop.</p>
           <span class="row-tight small" style="color:var(--color-accent)">Find a ride ${icon('arrowRight', 16)}</span>
+        </button>
+        <button class="portal-card" data-go="/parcel">
+          <span class="portal-icon">${icon('package', 24)}</span>
+          <h3>Parcel portal</h3>
+          <p class="small">Send packages ≤5 kg or deliver items along your route.</p>
+          <span class="row-tight small" style="color:var(--color-accent)">Send or deliver ${icon('arrowRight', 16)}</span>
         </button>
       </div>
 
@@ -68,6 +74,57 @@ export default function homeView(container) {
           </button>
         </section>
       </div>
+
+      <section class="card" style="margin-top:var(--space-6)">
+        <div class="card-title" style="margin-bottom:var(--space-4)">
+          <span class="portal-icon">${icon('sparkles', 20)}</span>
+          <h3 style="margin:0">How a shared trip works</h3>
+        </div>
+        <ol class="steps-list" style="list-style:none;padding:0;margin:0">
+          <li style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+            <span class="steps-num" style="font-size:var(--text-lg);font-weight:bold;color:var(--color-accent);min-width:32px">01</span>
+            <div>
+              <strong>Publish the trip you were making anyway</strong>
+              <p class="small muted" style="margin:2px 0 0">Where you are, where you are heading, your vehicle and free seats.</p>
+            </div>
+          </li>
+          <li style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+            <span class="steps-num" style="font-size:var(--text-lg);font-weight:bold;color:var(--color-accent);min-width:32px">02</span>
+            <div>
+              <strong>You appear live on the map</strong>
+              <p class="small muted" style="margin:2px 0 0">A bike or car marker carries your position and direction to everyone searching that corridor.</p>
+            </div>
+          </li>
+          <li style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+            <span class="steps-num" style="font-size:var(--text-lg);font-weight:bold;color:var(--color-accent);min-width:32px">03</span>
+            <div>
+              <strong>Passengers on your path book a seat</strong>
+              <p class="small muted" style="margin:2px 0 0">Only people whose pickup and drop both sit along your route can see you.</p>
+            </div>
+          </li>
+          <li style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+            <span class="steps-num" style="font-size:var(--text-lg);font-weight:bold;color:var(--color-accent);min-width:32px">04</span>
+            <div>
+              <strong>Share the cost, not a fare</strong>
+              <p class="small muted" style="margin:2px 0 0">Fares come from the shared distance alone — a legal cost split.</p>
+            </div>
+          </li>
+          <li style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+            <span class="steps-num" style="font-size:var(--text-lg);font-weight:bold;color:#ef4444;min-width:32px">05</span>
+            <div>
+              <strong style="color:#ef4444">Safe Ride with SOS Emergency</strong>
+              <p class="small muted" style="margin:2px 0 0">One tap is enough to trigger an SOS alert, share your live GPS location with trusted contacts, activate a loud emergency siren, and notify emergency responders, ensuring maximum safety throughout the journey.</p>
+            </div>
+          </li>
+          <li style="display:flex;gap:var(--space-3)">
+            <span class="steps-num" style="font-size:var(--text-lg);font-weight:bold;color:var(--color-accent);min-width:32px">06</span>
+            <div>
+              <strong>Parcel Delivery along your Route</strong>
+              <p class="small muted" style="margin:2px 0 0">Send or deliver packages ≤5 kg with travelers already heading your way. Dual OTP handoff (Pickup & Delivery) guarantees safe delivery and instant escrow payout.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
     </div>
   `;
 

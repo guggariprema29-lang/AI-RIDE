@@ -29,9 +29,23 @@ export const store = {
     return user.public_id || `AR-${String(user.id).padStart(6, '0')}`;
   },
 
+  get token() {
+    return read()?.token || read()?.access_token || null;
+  },
+
+  get unreadNotificationCount() {
+    return Number(localStorage.getItem('airide_unread_notifications') || 0);
+  },
+
+  setUnreadNotificationCount(count) {
+    localStorage.setItem('airide_unread_notifications', String(Math.max(0, count)));
+    listeners.forEach((fn) => fn(read()));
+  },
+
   setUser(user) {
     if (!user) {
       localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem('airide_unread_notifications');
     } else {
       const stored = { ...user };
       delete stored.password_hash;

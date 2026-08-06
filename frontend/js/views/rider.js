@@ -82,6 +82,13 @@ export default function riderView(container) {
               <textarea id="notes" placeholder="Two helmets available. Can wait 10 minutes at pickup."></textarea>
             </div>
 
+            <div class="field" style="margin-bottom:var(--space-4)">
+              <label class="row-tight" style="gap:var(--space-2);cursor:pointer;background:var(--color-surface-dim);padding:var(--space-3);border-radius:var(--radius-md);border:1px dashed var(--color-border)">
+                <input id="women-only" type="checkbox" style="width:18px;height:18px;cursor:pointer">
+                <span>🌸 <strong>Women-Only Ride</strong> (Visible exclusively to female passengers)</span>
+              </label>
+            </div>
+
             <button class="btn btn-primary btn-block btn-lg" type="submit">
               ${icon('navigation', 18)} I'm available — publish ride
             </button>
@@ -224,6 +231,7 @@ export default function riderView(container) {
         fare_per_km: Number(rateInput.value) || null,
         departure_time: new Date(container.querySelector('#departure').value || Date.now()).toISOString(),
         notes: container.querySelector('#notes').value.trim() || null,
+        women_only: container.querySelector('#women-only').checked,
       });
 
       toast('You are live on the map', 'success');
@@ -255,6 +263,7 @@ export default function riderView(container) {
           <span class="row-tight">
             ${icon(vehicleIconName(ride.vehicle_type), 18)}
             <strong>${escapeHtml(ride.origin.split(',')[0])} → ${escapeHtml(ride.destination.split(',')[0])}</strong>
+            ${ride.women_only ? `<span class="badge badge-women-only">🌸 Women-Only</span>` : ''}
           </span>
           <span class="badge ${statusBadge(ride.status)}">${escapeHtml(ride.status)}</span>
         </div>

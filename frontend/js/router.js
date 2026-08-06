@@ -66,8 +66,24 @@ async function resolve() {
   outlet.append(container);
 
   document.title = route.title ? `${route.title} · AI Ride` : 'AI Ride';
-  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  try {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  } catch {}
 
-  currentView = (await route.view(container, query)) || null;
+  try {
+    currentView = (await route.view(container, query)) || null;
+  } catch (err) {
+    console.error('[Router] Error rendering view:', err);
+    container.innerHTML = `
+      <div class="container page">
+        <div class="empty-state">
+          <h2>Something went wrong</h2>
+          <p class="small">${err?.message ? err.message : 'Failed to load page content'}</p>
+          <button class="btn btn-primary" data-home>Back to home</button>
+        </div>
+      </div>
+    `;
+    container.querySelector('[data-home]')?.addEventListener('click', () => navigate('/'));
+  }
   onNavigate(pathname);
 }

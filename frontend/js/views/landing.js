@@ -23,6 +23,14 @@ const STEPS = [
     title: 'Share the cost, not a fare',
     body: 'Fares come from the shared distance alone. No surge, no commission, no profit — a legal cost split.',
   },
+  {
+    title: 'Safe Ride with SOS Emergency',
+    body: 'One tap is enough to trigger an SOS alert, share your live GPS location with trusted contacts, activate a loud emergency siren, and notify emergency responders, ensuring maximum safety throughout the journey.',
+  },
+  {
+    title: 'Parcel Delivery along your Route',
+    body: 'Send or deliver packages ≤5 kg with travelers already heading your way. Dual OTP handoff (Pickup & Delivery) guarantees safe delivery and instant escrow payout.',
+  },
 ];
 
 // Shown on the map tile when nothing is live, so the section is never a dead
@@ -183,7 +191,7 @@ export default function landingView(container) {
       <div class="container steps-layout">
         <div class="steps-intro reveal">
           <h2>How a shared trip works</h2>
-          <p>Four steps. No dispatcher, no fleet, no middleman between you and the person in the next seat.</p>
+          <p>Six steps. Complete route matching, cost sharing, parcel sharing, and AI safety features with one-tap emergency response.</p>
           <button class="btn btn-primary" data-go="${startPath}">
             ${authed ? 'Open my dashboard' : 'Create my account'} ${icon('arrowRight', 16)}
           </button>

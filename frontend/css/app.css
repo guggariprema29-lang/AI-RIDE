@@ -1748,3 +1748,272 @@ input[aria-invalid="true"] { border-color: var(--color-destructive); }
   }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* ── Notification Bell & Notification Center Drawer ─────────────────── */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-strong);
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+
+.icon-btn:hover {
+  background: var(--color-elevated);
+  border-color: var(--color-border-strong);
+  color: var(--color-accent);
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+.notification-bell-btn {
+  position: relative;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-destructive, #ef4444);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px var(--color-surface);
+  transform: scale(0);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.notification-badge.is-visible {
+  transform: scale(1);
+  animation: pulseBadge 2s infinite;
+}
+
+@keyframes pulseBadge {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9990;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-base) var(--ease), visibility var(--dur-base) var(--ease);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawer-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.drawer-panel {
+  width: 100%;
+  max-width: 440px;
+  height: 100%;
+  background: var(--color-surface);
+  border-left: 1px solid var(--hairline);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.drawer-overlay.is-open .drawer-panel {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-elevated);
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--color-muted);
+}
+
+.drawer-tabs::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-foreground-dim);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.tab-btn.is-active, .tab-btn:hover {
+  background: var(--color-surface-strong);
+  color: var(--color-foreground);
+}
+
+.tab-btn.is-active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.notification-card {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-elevated);
+  border: 1px solid var(--hairline);
+  transition: opacity var(--dur-base) var(--ease), transform var(--dur-base) var(--ease), border-color var(--dur-base) var(--ease);
+}
+
+.notification-card.is-unread {
+  border-left: 3px solid var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 25%, var(--color-elevated));
+}
+
+.notification-card.is-read {
+  opacity: 0.75;
+}
+
+.notification-card.is-read:hover {
+  opacity: 1;
+}
+
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-strong);
+  color: var(--color-foreground);
+}
+
+.notification-icon.category-ride { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.notification-icon.category-booking { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.notification-icon.category-payment { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.notification-icon.category-emergency { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.notification-icon.category-system { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.notification-time {
+  font-size: 11px;
+  color: var(--color-foreground-dim);
+}
+
+.notification-msg {
+  margin: var(--space-1) 0 var(--space-2) 0;
+  font-size: var(--text-xs);
+  color: var(--color-foreground-dim);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.notification-actions {
+  gap: var(--space-3);
+}
+
+.btn-text-action {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-text-action:hover {
+  text-decoration: underline;
+}
+
+.btn-text-action.danger {
+  color: var(--color-foreground-dim);
+}
+
+.btn-text-action.danger:hover {
+  color: var(--color-destructive);
+}
+
+/* ── Parcel Sharing Styles ─────────────────────────────────────────────── */
+
+.badge.category-documents { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.badge.category-clothes { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.badge.category-electronics { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+.badge.category-gift { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
+.badge.category-food { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.badge.category-medicine { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.badge.category-books { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+
+.badge-success { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.badge-primary { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.badge-warning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.badge-neutral { background: var(--color-surface-strong); color: var(--color-foreground-dim); }
+
+.badge-women-only {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(168, 85, 247, 0.25));
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.4);
+  font-weight: 600;
+}

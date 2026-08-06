@@ -137,6 +137,16 @@ export function signupView(container, query) {
         <input id="su-password" type="password" autocomplete="new-password" placeholder="At least 6 characters" required>
         <span class="error" hidden></span>
       </div>
+      <div class="field">
+        <label for="su-gender">Gender</label>
+        <select id="su-gender" class="input">
+          <option value="unspecified">Unspecified / Decline to state</option>
+          <option value="female">Female 👧 (Enables Women Safety Mode)</option>
+          <option value="male">Male 👨</option>
+          <option value="other">Other 👤</option>
+        </select>
+        <span class="helper">Required to access or publish Women-Only rides and parcels.</span>
+      </div>
 
       <div class="card card-tight" style="background:var(--color-muted);margin-bottom:var(--space-4)">
         <div class="row-tight" style="justify-content:space-between">
@@ -219,8 +229,21 @@ export function signupView(container, query) {
 
     if (fields.name.value.trim().length < 2) { fieldError(fields.name, 'Enter your full name'); valid = false; }
     if (!fields.email.value.includes('@')) { fieldError(fields.email, 'Enter a valid email address'); valid = false; }
-    if (fields.phone.value.trim().length < 8) { fieldError(fields.phone, 'Enter a reachable phone number'); valid = false; }
-    if (fields.gov.value.trim().length < 4) { fieldError(fields.gov, 'Enter your ID number'); valid = false; }
+    const cleanPhone = fields.phone.value.trim().replace(/\D/g, '');
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(cleanPhone)) {
+      fieldError(fields.phone, 'Enter a valid 10-digit Indian phone number starting with 6-9');
+      valid = false;
+    }
+
+    const govId = fields.gov.value.trim().toUpperCase().replace(/\s|-/g, '');
+    const isAadhaar = /^\d{12}$/.test(govId);
+    const isPan = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(govId);
+    const isDl = /^[A-Z]{2}\d{13}$/.test(govId);
+    if (!isAadhaar && !isPan && !isDl) {
+      fieldError(fields.gov, 'Enter valid 12-digit Aadhaar, PAN (e.g. ABCDE1234F), or Driving License number');
+      valid = false;
+    }
     if (fields.password.value.length < 6) { fieldError(fields.password, 'Use at least 6 characters'); valid = false; }
     if (!valid) return;
 
@@ -233,6 +256,7 @@ export function signupView(container, query) {
         phone: fields.phone.value.trim(),
         government_id: fields.gov.value.trim(),
         password: fields.password.value,
+        gender: form.querySelector('#su-gender').value,
         face_verified: phoneVerified,
       });
       afterAuth(user, query.next);

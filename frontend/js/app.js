@@ -1,9 +1,8 @@
-// App bootstrap: theme, header, navigation and the route table.
-
 import { defineRoute, navigate, startRouter, currentPath } from './router.js';
 import { store, theme } from './store.js';
 import { icon } from './icons.js';
-import { escapeHtml, initials } from './ui.js';
+import { escapeHtml, initials, showNotificationDrawer, toast } from './ui.js';
+import { api, connectNotificationWS } from './api.js';
 
 import landingView from './views/landing.js';
 import { loginView, signupView } from './views/auth.js';
@@ -13,6 +12,7 @@ import passengerView from './views/passenger.js';
 import { bookingsView, myTripsView } from './views/trips.js';
 import tripView from './views/trip.js';
 import profileView from './views/profile.js';
+import parcelView from './views/parcel.js';
 
 theme.apply();
 
@@ -20,6 +20,7 @@ const NAV = [
   { path: '/home', label: 'Home', icon: 'home', auth: true },
   { path: '/rider', label: 'Rider', icon: 'car', auth: true },
   { path: '/passenger', label: 'Passenger', icon: 'users', auth: true },
+  { path: '/parcel', label: 'Parcel', icon: 'package', auth: true },
   { path: '/bookings', label: 'Bookings', icon: 'ticket', auth: true },
   { path: '/trips', label: 'Trips', icon: 'briefcase', auth: true },
 ];
@@ -60,9 +61,50 @@ const navNode = app.querySelector('[data-nav]');
 const bottomNavNode = app.querySelector('[data-bottom-nav]');
 const accountNode = app.querySelector('[data-account]');
 
+let activeWS = null;
+let pollTimer = null;
+
+function updateBellBadge(count) {
+  const badge = app.querySelector('[data-notification-count]');
+  if (badge) {
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.classList.toggle('is-visible', count > 0);
+  }
+}
+
+async function syncNotifications() {
+  if (!store.isAuthed) return;
+  try {
+    const res = await api.notifications(store.user.id);
+    const count = res?.unread_count || 0;
+    store.setUnreadNotificationCount(count);
+    updateBellBadge(count);
+  } catch {}
+}
+
+function initNotifications() {
+  if (activeWS) { try { activeWS.close(); } catch {} activeWS = null; }
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+  if (!store.isAuthed) return;
+
+  syncNotifications();
+
+  activeWS = connectNotificationWS(store.user.id, (event) => {
+    if (event?.type === 'NOTIFICATION_NEW' || event?.notification) {
+      syncNotifications();
+      const note = event.notification || {};
+      toast(`${note.title || 'Notification'}: ${note.message || ''}`, 'info');
+    }
+  });
+
+  pollTimer = setInterval(syncNotifications, 15000);
+}
+
 function renderNav() {
   const authed = store.isAuthed;
   const items = NAV.filter((item) => !item.auth || authed);
+  const unread = store.unreadNotificationCount;
 
   navNode.innerHTML = items
     .map((item) => `<a class="nav-link" href="#${item.path}">${icon(item.icon, 16)} ${item.label}</a>`)
@@ -83,7 +125,14 @@ function renderNav() {
       ${icon(theme.current === 'dark' ? 'sun' : 'moon', 18)}
     </button>
     ${authed
-      ? `<a class="nav-link" href="#/profile" title="${escapeHtml(store.publicId)}">
+      ? `
+        <button class="icon-btn notification-bell-btn" data-notification-bell aria-label="Notifications" title="Notification Center">
+          ${icon('bell', 18)}
+          <span class="notification-badge ${unread > 0 ? 'is-visible' : ''}" data-notification-count>
+            ${unread > 99 ? '99+' : unread}
+          </span>
+        </button>
+        <a class="nav-link" href="#/profile" title="${escapeHtml(store.publicId)}">
            <span class="avatar" style="width:30px;height:30px;flex-basis:30px;font-size:var(--text-xs)">
              ${escapeHtml(initials(store.user?.name))}
            </span>
@@ -98,7 +147,20 @@ function renderNav() {
     renderNav();
     markActive(currentPath().split('?')[0]);
   });
+
+  const bellBtn = accountNode.querySelector('[data-notification-bell]');
+  if (bellBtn) {
+    bellBtn.addEventListener('click', () => {
+      if (store.isAuthed) {
+        showNotificationDrawer(store.user.id, {
+          onUpdate: (newCount) => updateBellBadge(newCount)
+        });
+      }
+    });
+  }
 }
+
+initNotifications();
 
 const header = app.querySelector('.site-header');
 
@@ -128,6 +190,7 @@ const ROUTE_LABELS = {
   '/home': 'Home',
   '/rider': 'Rider',
   '/passenger': 'Passenger',
+  '/parcel': 'Parcel sharing',
   '/bookings': 'My trips',
   '/trips': 'Published',
   '/trip': 'Live trip',
@@ -166,6 +229,7 @@ defineRoute('/signup', { title: 'Create account', view: signupView, guestOnly: t
 defineRoute('/home', { title: 'Home', view: homeView, requiresAuth: true });
 defineRoute('/rider', { title: 'Rider portal', view: riderView, requiresAuth: true });
 defineRoute('/passenger', { title: 'Passenger portal', view: passengerView, requiresAuth: true });
+defineRoute('/parcel', { title: 'Parcel sharing', view: parcelView, requiresAuth: true });
 defineRoute('/bookings', { title: 'My bookings', view: bookingsView, requiresAuth: true });
 defineRoute('/trip', { title: 'Live trip', view: tripView, requiresAuth: true });
 defineRoute('/trips', { title: 'My trips', view: myTripsView, requiresAuth: true });

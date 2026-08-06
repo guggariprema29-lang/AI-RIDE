@@ -1,4 +1,4 @@
-// Thin wrapper around the FastAPI backend.
+import { store } from './store.js';
 
 export const DEFAULT_API_BASE = 'http://127.0.0.1:8000';
 
@@ -12,10 +12,15 @@ function resolveApiBase() {
   const stored = localStorage.getItem('airide_api_base');
   if (stored) return stored.replace(/\/$/, '');
 
-  const meta = document.querySelector('meta[name="airide-api"]')?.content?.trim();
-  if (meta) return meta.replace(/\/$/, '');
+  const host = (typeof window !== 'undefined' && window.location.hostname) || '127.0.0.1';
+  const isLocal = host === '127.0.0.1' || host === 'localhost' || host.startsWith('192.168.') || host.startsWith('10.');
 
-  return DEFAULT_API_BASE;
+  const meta = document.querySelector('meta[name="airide-api"]')?.content?.trim();
+  if (meta && !isLocal) return meta.replace(/\/$/, '');
+
+  if (isLocal) return `http://${host}:8000`;
+
+  return meta || 'https://airide-api-mzah.onrender.com';
 }
 
 export const API_BASE_URL = resolveApiBase();
@@ -30,10 +35,14 @@ export class ApiError extends Error {
 
 async function request(path, { method = 'GET', body, signal } = {}) {
   let response;
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (store.token) headers['Authorization'] = `Bearer ${store.token}`;
+
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: body ? JSON.stringify(body) : undefined,
       signal,
     });
@@ -51,8 +60,6 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   const text = await response.text();
   const data = text ? safeParse(text) : null;
 
-  // A plain file server on port 8000 answers with HTML, not JSON — a common
-  // mix-up when `python -m http.server 8000` is left running.
   const looksLikeApi = (response.headers.get('content-type') || '').includes('json');
   if (!looksLikeApi && (response.status === 404 || response.status === 501)) {
     throw new ApiError(
@@ -62,6 +69,9 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && store.token) {
+      store.logout();
+    }
     const detail = data?.detail || data?.message || `Request failed (${response.status})`;
     throw new ApiError(typeof detail === 'string' ? detail : 'Request failed', response.status);
   }
@@ -84,6 +94,8 @@ export const api = {
 
   publishRide: (payload) => request('/rides/publish', { method: 'POST', body: payload }),
   liveRides: (signal) => request('/rides/live', { signal }),
+  nearbyRiders: (lat, lng, radius_m = 5000, signal) =>
+    request(`/rides/nearby?lat=${lat}&lng=${lng}&radius_m=${radius_m}`, { signal }),
   ridesByRider: (riderId) => request(`/rides/rider/${riderId}`),
   ride: (id) => request(`/rides/${id}`),
   updateRideLocation: (id, latitude, longitude) =>
@@ -94,9 +106,12 @@ export const api = {
   searchRides: (payload, signal) => request('/rides/search', { method: 'POST', body: payload, signal }),
 
   book: (payload) => request('/bookings', { method: 'POST', body: payload }),
+  bookRelay: (payload) => request('/bookings/relay', { method: 'POST', body: payload }),
   booking: (id) => request(`/bookings/${id}`),
   passengerBookings: (id) => request(`/bookings/passenger/${id}`),
   riderBookings: (id) => request(`/bookings/rider/${id}`),
+  getChatMessages: (id) => request(`/bookings/${id}/chat`),
+  sendChatMessage: (id, payload) => request(`/bookings/${id}/chat`, { method: 'POST', body: payload }),
   updateBookingStatus: (id, status) =>
     request(`/bookings/${id}/status`, { method: 'POST', body: { status } }),
   startBooking: (id, otp) => request(`/bookings/${id}/start`, { method: 'POST', body: { otp } }),
@@ -105,10 +120,55 @@ export const api = {
   rateBooking: (id, payload) => request(`/bookings/${id}/rate`, { method: 'POST', body: payload }),
   reviews: (userId) => request(`/users/${userId}/reviews`),
 
+  notifications: (userId, category = null) =>
+    request(`/notifications/${userId}${category && category !== 'all' ? `?category=${encodeURIComponent(category)}` : ''}`),
+  createNotification: (payload) => request('/notifications/create', { method: 'POST', body: payload }),
+  markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'POST', body: {} }),
+  markAllNotificationsRead: (userId) => request(`/notifications/read-all/${userId}`, { method: 'POST', body: {} }),
+  deleteNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  clearNotifications: (userId) => request(`/notifications/clear/${userId}`, { method: 'POST', body: {} }),
+
+  triggerSos: (payload) => request('/sos/trigger', { method: 'POST', body: payload }),
+  updateEmergencyContact: (payload) => request('/sos/contact', { method: 'POST', body: payload }),
+  getSosAlerts: (userId) => request(`/sos/alerts/${userId}`),
+  resolveSos: (alertId) => request(`/sos/${alertId}/resolve`, { method: 'POST', body: {} }),
+
   wallet: (userId) => request(`/wallet/balance/${userId}`),
   deposit: (userId, amount) =>
     request('/wallet/deposit', { method: 'POST', body: { user_id: userId, amount } }),
+
+  createParcel: (payload) => request('/parcels/create', { method: 'POST', body: payload }),
+  senderParcels: (senderId) => request(`/parcels/sender/${senderId}`),
+  riderParcels: (riderId) => request(`/parcels/rider/${riderId}`),
+  nearbyParcels: (rideId, maxDetourM = 3000) => request(`/parcels/nearby/${rideId}?max_detour_m=${maxDetourM}`),
+  acceptParcel: (id, riderId, rideId) => request(`/parcels/${id}/accept`, { method: 'POST', body: { rider_id: riderId, ride_id: rideId } }),
+  verifyParcelPickup: (id, otp) => request(`/parcels/${id}/verify-pickup`, { method: 'POST', body: { otp } }),
+  verifyParcelDelivery: (id, otp) => request(`/parcels/${id}/verify-delivery`, { method: 'POST', body: { otp } }),
+  cancelParcel: (id, userId) => request(`/parcels/${id}/cancel`, { method: 'POST', body: { user_id: userId } }),
 };
+
+export function connectNotificationWS(userId, onMessage) {
+  if (!userId) return null;
+  const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + `/ws/notifications/${userId}`;
+  let ws = null;
+  try {
+    ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (onMessage) onMessage(data);
+      } catch (err) {
+        console.warn('[WS] Failed to parse message', err);
+      }
+    };
+    ws.onerror = (err) => {
+      console.warn('[WS] Connection error', err);
+    };
+  } catch (e) {
+    console.warn('[WS] Initialization failed', e);
+  }
+  return ws;
+}
 
 /* ── Geocoding (OpenStreetMap Nominatim) ─────────────────────────────────── */
 

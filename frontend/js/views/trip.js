@@ -2,12 +2,12 @@
 // Map on top, status rail, and a contextual action sheet that changes with the
 // stage of the trip.
 
-import { api } from '../api.js';
+import { api, API_BASE_URL } from '../api.js';
 import { icon, vehicleIconName } from '../icons.js';
 import { store } from '../store.js';
 import { navigate } from '../router.js';
 import { createMap, TripMap } from '../map.js';
-import { escapeHtml, initials, km, rupees, setBusy, timeLabel, toast } from '../ui.js';
+import { escapeHtml, initials, km, rupees, setBusy, timeLabel, toast, openSosEmergencyModal, toggleSirenSound } from '../ui.js';
 
 const STAGES = [
   { key: 'pending', label: 'Requested' },
@@ -37,6 +37,9 @@ export default function tripView(container, query) {
       <div class="trip-map-wrap">
         <div id="trip-map" class="trip-map" role="img" aria-label="Live trip map"></div>
         <button class="icon-btn trip-back" data-back aria-label="Back">${icon('arrowRight', 18, 'rotate-180')}</button>
+        <button class="btn btn-danger btn-sm" data-trip-sos style="position:absolute;top:var(--space-3);right:var(--space-3);z-index:900;font-weight:bold;box-shadow:0 0 15px rgba(239,68,68,0.5)">
+          🚨 RED SOS BUTTON
+        </button>
         <div class="trip-eta glass" data-eta></div>
       </div>
 
@@ -53,6 +56,28 @@ export default function tripView(container, query) {
 
   container.querySelector('[data-back]').addEventListener('click', () => {
     navigate(isRider() ? '/rider' : '/bookings');
+  });
+
+  container.querySelector('[data-trip-sos]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    toggleSirenSound(true); // START SIREN SOUND IMMEDIATELY ON CLICK
+    setBusy(button, true, 'SOS…');
+    try {
+      const lat = Number(booking?.current_lat || booking?.pickup_lat || 12.9716);
+      const lng = Number(booking?.current_lng || booking?.pickup_lng || 77.5946);
+      const res = await api.triggerSos({
+        user_id: user.id,
+        booking_id: bookingId,
+        latitude: lat,
+        longitude: lng,
+        location_name: `Trip #${bookingId} Live GPS`
+      });
+      openSosEmergencyModal({ res });
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setBusy(button, false);
+    }
   });
 
   map = createMap(container.querySelector('#trip-map'));
@@ -112,7 +137,12 @@ export default function tripView(container, query) {
             · ${icon('star', 11)} trust ${person.trust ?? '—'}
           </div>
         </div>
-        ${person.phone ? `<a class="icon-btn" href="tel:${escapeHtml(person.phone)}" aria-label="Call ${escapeHtml(person.name)}">${icon('phone', 18)}</a>` : ''}
+        <div class="row-tight" style="gap:6px">
+          ${person.phone ? `<a class="icon-btn" href="tel:${escapeHtml(person.phone)}" aria-label="Call ${escapeHtml(person.name)}">${icon('phone', 18)}</a>` : ''}
+          <button class="btn btn-sm btn-accent" data-open-chat style="gap:4px;font-weight:600">
+            ${icon('message-circle', 16)} Live Chat
+          </button>
+        </div>
       </div>
     `;
   }
@@ -430,6 +460,167 @@ export default function tripView(container, query) {
         setBusy(button, false);
       }
     });
+
+    bodyNode.querySelectorAll('[data-open-chat]').forEach((btn) => {
+      btn.addEventListener('click', openLiveChatModal);
+    });
+  }
+
+  let chatModal = null;
+  let chatPollTimer = null;
+
+  async function openLiveChatModal() {
+    if (chatModal) return;
+    const person = counterparty();
+    const modalHtml = `
+      <div class="modal-backdrop" id="chat-modal-bg" style="display:flex;align-items:center;justify-content:center;z-index:9999;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);position:fixed;inset:0">
+        <div class="modal-card" style="width:92%;max-width:440px;height:530px;display:flex;flex-direction:column;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:0;overflow:hidden">
+          
+          <!-- Header -->
+          <div style="padding:var(--space-3);background:var(--color-surface-2);border-bottom:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between">
+            <div class="row-tight" style="gap:10px">
+              <span class="avatar" style="width:34px;height:34px;font-size:12px;background:var(--color-primary);color:#fff">${escapeHtml(initials(person.name))}</span>
+              <div>
+                <strong style="font-size:14px;display:block">${escapeHtml(person.name)}</strong>
+                <span class="xsmall muted" style="display:flex;align-items:center;gap:4px">
+                  <span class="live-dot" style="background:#22c55e"></span> Live Chat (${person.role})
+                </span>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="close-chat-btn">${icon('x', 18)}</button>
+          </div>
+
+          <!-- Quick Chips -->
+          <div class="row-tight" style="padding:6px 12px;background:var(--color-surface);border-bottom:1px solid var(--color-border);overflow-x:auto;gap:6px;white-space:nowrap">
+            <button class="chip" data-quick-chat="I am at the pickup point 📍">📍 At pickup</button>
+            <button class="chip" data-quick-chat="On my way, 5 mins away 🚗">🚗 5 mins away</button>
+            <button class="chip" data-quick-chat="Stuck in traffic, slight delay 🚦">🚦 Traffic delay</button>
+          </div>
+
+          <!-- Messages Body -->
+          <div id="chat-msg-body" style="flex:1;padding:var(--space-3);overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+            <div class="muted xsmall text-center" style="margin:auto">Loading conversation history…</div>
+          </div>
+
+          <!-- Input Footer -->
+          <form id="chat-form" style="padding:var(--space-2) var(--space-3);background:var(--color-surface-2);border-top:1px solid var(--color-border);display:flex;gap:8px">
+            <input type="text" id="chat-input" placeholder="Type a message…" style="flex:1;border-radius:var(--radius-full);padding:8px 14px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-foreground)" required autocomplete="off">
+            <button class="btn btn-primary" type="submit" style="border-radius:var(--radius-full);padding:8px 16px;font-weight:bold">
+              ${icon('send', 16)}
+            </button>
+          </form>
+
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    chatModal = document.getElementById('chat-modal-bg');
+
+    const msgBody = chatModal.querySelector('#chat-msg-body');
+    const chatForm = chatModal.querySelector('#chat-form');
+    const chatInput = chatModal.querySelector('#chat-input');
+
+    chatModal.querySelector('#close-chat-btn').addEventListener('click', closeLiveChatModal);
+
+    chatModal.querySelectorAll('[data-quick-chat]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        chatInput.value = btn.dataset.quickChat;
+        chatForm.dispatchEvent(new Event('submit'));
+      });
+    });
+
+    async function loadMessages() {
+      try {
+        const res = await api.getChatMessages(booking.id);
+        const list = res.messages || [];
+        if (!list.length) {
+          msgBody.innerHTML = '<div class="muted xsmall text-center" style="margin:auto">No messages yet. Send a quick message to coordinate pickup!</div>';
+          return;
+        }
+
+        const isAtBottom = msgBody.scrollHeight - msgBody.clientHeight <= msgBody.scrollTop + 60;
+
+        msgBody.innerHTML = list.map((msg) => {
+          const isMe = Number(msg.sender_id) === Number(user.id);
+          return `
+            <div style="display:flex;flex-direction:column;align-items:${isMe ? 'flex-end' : 'flex-start'};max-width:85%;align-self:${isMe ? 'flex-end' : 'flex-start'}">
+              <span class="xsmall muted" style="margin-bottom:2px;font-size:10px">${escapeHtml(msg.sender_name)}</span>
+              <div style="padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.4;${isMe ? 'background:var(--color-primary);color:#fff;border-bottom-right-radius:2px' : 'background:var(--color-surface-2);color:var(--color-foreground);border:1px solid var(--color-border);border-bottom-left-radius:2px'}">
+                ${escapeHtml(msg.message)}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if (isAtBottom) msgBody.scrollTop = msgBody.scrollHeight;
+      } catch (err) {
+        console.error('Chat refresh error:', err);
+      }
+    }
+
+    await loadMessages();
+    chatPollTimer = setInterval(loadMessages, 3000);
+
+    // Establish WebSocket Connection for Sub-Millisecond Instant Chat Delivery
+    let ws = null;
+    try {
+      const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + `/ws/${user.id}`;
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'chat_message' && Number(data.booking_id) === Number(booking.id)) {
+            loadMessages();
+          }
+        } catch (e) { console.error('WS Parse Error', e); }
+      };
+    } catch (e) {
+      console.log('WS Connection fallback to polling:', e);
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) return;
+      chatInput.value = '';
+
+      // Try sending via WebSocket first for instant latency
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'chat_message',
+          booking_id: booking.id,
+          sender_id: user.id,
+          sender_name: user.name || 'Commuter',
+          message: text
+        }));
+        setTimeout(loadMessages, 100);
+      } else {
+        try {
+          await api.sendChatMessage(booking.id, {
+            sender_id: user.id,
+            sender_name: user.name || 'Commuter',
+            message: text
+          });
+          await loadMessages();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      }
+    });
+
+    chatModal._ws = ws;
+  }
+
+  function closeLiveChatModal() {
+    if (chatPollTimer) clearInterval(chatPollTimer);
+    if (chatModal) {
+      if (chatModal._ws) {
+        try { chatModal._ws.close(); } catch {}
+      }
+      chatModal.remove();
+    }
+    chatModal = null;
   }
 
   async function refresh(redraw = true) {
@@ -444,7 +635,23 @@ export default function tripView(container, query) {
       }
       render();
     } catch (error) {
-      bodyNode.innerHTML = `<p class="small">${escapeHtml(error.message)}</p>`;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      bodyNode.innerHTML = `
+        <div class="card" style="max-width:480px;margin:var(--space-6) auto;text-align:center;padding:var(--space-5)">
+          <div style="font-size:36px;margin-bottom:var(--space-2)">🎫</div>
+          <h3 style="margin-bottom:var(--space-2)">Trip Not Found</h3>
+          <p class="small muted" style="margin-bottom:var(--space-4)">
+            No active booking found for ID #${escapeHtml(String(bookingId))}. It may have been closed or cancelled.
+          </p>
+          <button class="btn btn-primary" data-go="/passenger">${icon('search', 16)} Find Rides</button>
+        </div>
+      `;
+      bodyNode.querySelector('[data-go]')?.addEventListener('click', (e) => {
+        navigate(e.currentTarget.dataset.go);
+      });
     }
   }
 
@@ -453,6 +660,7 @@ export default function tripView(container, query) {
 
   return {
     destroy() {
+      closeLiveChatModal();
       clearInterval(timer);
       tripMap.destroy();
       map.remove();

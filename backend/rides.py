@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS rides (
     fare_per_km REAL DEFAULT 6.0,
     departure_time TIMESTAMPTZ NOT NULL,
     notes TEXT,
+    women_only BOOLEAN DEFAULT FALSE,
     status TEXT DEFAULT 'available',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -75,7 +76,7 @@ RIDE_COLUMNS = """
     r.origin_lat, r.origin_lng, r.dest_lat, r.dest_lng,
     r.current_lat, r.current_lng, r.polyline, r.total_distance_m,
     r.vehicle_type, r.vehicle_number, r.seats_total, r.seats_available,
-    r.fare_per_km, r.departure_time, r.notes, r.status, r.created_at, r.updated_at
+    r.fare_per_km, r.departure_time, r.notes, r.women_only, r.status, r.created_at, r.updated_at
 """
 
 
@@ -90,6 +91,7 @@ BOOKING_MIGRATIONS = [
     "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rider_review TEXT;",
     "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS passenger_rating REAL;",
     "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS passenger_review TEXT;",
+    "ALTER TABLE rides ADD COLUMN IF NOT EXISTS women_only BOOLEAN DEFAULT FALSE;",
 ]
 
 
@@ -140,9 +142,9 @@ def publish_ride(data: dict) -> dict:
                     origin_lat, origin_lng, dest_lat, dest_lng,
                     current_lat, current_lng, polyline, total_distance_m,
                     vehicle_type, vehicle_number, seats_total, seats_available,
-                    fare_per_km, departure_time, notes, status
+                    fare_per_km, departure_time, notes, women_only, status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'available')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'available')
                 RETURNING *;
                 """,
                 (
@@ -164,6 +166,7 @@ def publish_ride(data: dict) -> dict:
                     data.get("fare_per_km", 6.0),
                     data["departure_time"],
                     data.get("notes"),
+                    bool(data.get("women_only", False)),
                 ),
             )
             ride = cursor.fetchone()
@@ -187,7 +190,8 @@ def _rows_with_rider(where: str, params: tuple, limit: Optional[int] = None) -> 
                    u.trust_score AS rider_trust_score,
                    u.rating AS rider_rating,
                    u.face_verified AS rider_verified,
-                   u.phone AS rider_phone
+                   u.phone AS rider_phone,
+                   u.gender AS rider_gender
             FROM rides r
             JOIN users u ON u.id = r.rider_id
             {where}
@@ -207,6 +211,26 @@ def get_live_rides(limit: int = 200) -> list[dict]:
         (),
         limit,
     )
+
+
+def get_nearby_rides(lat: float, lng: float, radius_m: float = 5000.0, limit: int = 50) -> list[dict]:
+    """Find live riders whose current position or origin is within `radius_m` meters of (lat, lng)."""
+    from route_engine import haversine
+    live = get_live_rides(limit=200)
+    nearby = []
+    for ride in live:
+        rider_lat = ride.get("current_lat") or ride.get("origin_lat")
+        rider_lng = ride.get("current_lng") or ride.get("origin_lng")
+        if rider_lat is None or rider_lng is None:
+            continue
+        dist = haversine((lat, lng), (rider_lat, rider_lng))
+        if dist <= radius_m:
+            ride_copy = dict(ride)
+            ride_copy["distance_m"] = round(dist, 1)
+            ride_copy["distance_km"] = round(dist / 1000.0, 2)
+            nearby.append(ride_copy)
+    nearby.sort(key=lambda r: r["distance_m"])
+    return nearby[:limit]
 
 
 def get_ride(ride_id: int) -> Optional[dict]:
@@ -392,7 +416,23 @@ def start_booking_with_otp(booking_id: int, otp: str) -> tuple[Optional[dict], s
         raise
     finally:
         conn.close()
-    return get_booking(booking_id), ""
+
+    updated = get_booking(booking_id)
+    if updated:
+        from notifications import create_notification
+        pax_id = updated.get("passenger_id")
+        rider_name = updated.get("rider_name", "Your rider")
+        pickup = updated.get("pickup", "pickup point")
+        dropoff = updated.get("dropoff", "destination")
+        if pax_id:
+            create_notification(
+                user_id=pax_id,
+                event_type="ride_started",
+                title="Ride Started!",
+                message=f"Your trip with {rider_name} from {pickup} to {dropoff} has started. Have a safe journey!",
+                booking_id=booking_id
+            )
+    return updated, ""
 
 
 def complete_booking(booking_id: int) -> tuple[Optional[dict], str]:
@@ -568,12 +608,12 @@ def get_user_reviews(user_id: int, limit: int = 20) -> list[dict]:
 
 
 def update_booking_status(booking_id: int, status: str) -> Optional[dict]:
-    """Cancelling or rejecting a booking returns the seats to the ride."""
+    """Cancelling or rejecting a booking returns seats to the ride and refunds escrow."""
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
-                "SELECT ride_id, seats, status FROM bookings WHERE id = %s FOR UPDATE;",
+                "SELECT ride_id, passenger_id, seats, fare, status FROM bookings WHERE id = %s FOR UPDATE;",
                 (booking_id,),
             )
             booking = cursor.fetchone()
@@ -593,10 +633,59 @@ def update_booking_status(booking_id: int, status: str) -> Optional[dict]:
                     "UPDATE rides SET seats_available = seats_available + %s WHERE id = %s;",
                     (booking["seats"], booking["ride_id"]),
                 )
+                # Refund escrow back to passenger if held
+                fare = float(booking.get("fare") or 0.0)
+                if fare > 0:
+                    cursor.execute(
+                        """
+                        UPDATE users SET wallet_balance = wallet_balance + LEAST(escrow_balance, %s),
+                                         escrow_balance = GREATEST(0.0, escrow_balance - %s)
+                        WHERE id = %s;
+                        """,
+                        (fare, fare, booking["passenger_id"])
+                    )
         conn.commit()
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
-    return get_booking(booking_id)
+
+    updated = get_booking(booking_id)
+    if updated:
+        from notifications import create_notification
+        pax_id = updated.get("passenger_id")
+        rider_id = updated.get("rider_id")
+        rider_name = updated.get("rider_name", "Your rider")
+        pax_name = updated.get("passenger_name", "Passenger")
+        pickup = updated.get("pickup", "pickup point")
+        dropoff = updated.get("dropoff", "destination")
+
+        if status == "accepted" and pax_id:
+            create_notification(
+                user_id=pax_id,
+                event_type="ride_accepted",
+                title="Ride Accepted!",
+                message=f"Your ride request from {pickup} to {dropoff} has been accepted by {rider_name}.",
+                booking_id=booking_id
+            )
+        elif status in ("cancelled", "rejected"):
+            title = "Ride Cancelled" if status == "cancelled" else "Ride Request Declined"
+            if pax_id:
+                create_notification(
+                    user_id=pax_id,
+                    event_type="ride_cancelled",
+                    title=title,
+                    message=f"Booking #{booking_id} from {pickup} to {dropoff} was {status}.",
+                    booking_id=booking_id
+                )
+            if rider_id:
+                create_notification(
+                    user_id=rider_id,
+                    event_type="ride_cancelled",
+                    title=title,
+                    message=f"Booking #{booking_id} for passenger {pax_name} was {status}.",
+                    booking_id=booking_id
+                )
+
+    return updated

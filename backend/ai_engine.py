@@ -118,30 +118,7 @@ def generate_risk_reasons(
     return ", ".join(reasons)
 
 
-def classify_risk_level(
-    package_weight_kg: float,
-    package_category: str,
-    departure_time_text: str,
-    user_trust_score: int,
-    area_safety_index: float = 0.5,
-) -> Literal["low" ,"medium", "high"]:
-    score = 0.0
-    if package_weight_kg > 5.0:
-        score += 0.4
-    if package_category.lower() not in {"documents", "clothes", "accessories", "gift", "electronics"}:
-        score += 0.25
-    if "night" in departure_time_text.lower() or "00:" in departure_time_text:
-        score += 0.2
-    if user_trust_score < 60:
-        score += 0.2
-    if area_safety_index < 0.4:
-        score += 0.15
 
-    if score >= 0.7:
-        return "high"
-    if score >= 0.35:
-        return "medium"
-    return "low"
 
 
 def estimate_carbon_savings(shared_route_m: float, individual_route_m: float) -> float:

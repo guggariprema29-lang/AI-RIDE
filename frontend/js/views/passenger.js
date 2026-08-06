@@ -8,7 +8,7 @@ import { createMap, RoutePreview, LiveRidesLayer } from '../map.js';
 import { placeInput } from '../components/place-input.js';
 import {
   emptyState, escapeHtml, initials, km, rupees, setBusy, skeletonList,
-  timeLabel, toast, trustBadge,
+  timeLabel, toast, trustBadge, openSosEmergencyModal, toggleSirenSound,
 } from '../ui.js';
 
 export default function passengerView(container) {
@@ -54,6 +54,11 @@ export default function passengerView(container) {
                   <option value="10000">10 km</option>
                 </select>
               </div>
+            <div class="field" style="margin-bottom:var(--space-3)">
+              <label class="row-tight" style="gap:var(--space-2);cursor:pointer;background:var(--color-surface-dim);padding:var(--space-2) var(--space-3);border-radius:var(--radius-md)">
+                <input id="pax-women-only" type="checkbox" style="width:16px;height:16px;cursor:pointer">
+                <span class="small">🌸 <strong>Women-Only Rides Only</strong></span>
+              </label>
             </div>
 
             <button class="btn btn-primary btn-block btn-lg" type="submit">
@@ -65,9 +70,12 @@ export default function passengerView(container) {
         </section>
 
         <div class="stack">
-          <div class="map-panel">
+          <div class="map-panel" style="position:relative">
             <div id="pax-map" class="map-canvas" role="img"
                  aria-label="Map of your trip and matching travellers"></div>
+            <button class="btn btn-danger btn-sm" data-map-sos style="position:absolute;top:var(--space-3);right:var(--space-3);z-index:900;font-weight:bold;box-shadow:0 0 15px rgba(239,68,68,0.6)">
+              🚨 RED SOS BUTTON
+            </button>
             <div class="map-count" data-live-count>Live map</div>
             <div class="map-legend">
               <span class="row-tight"><span class="legend-dot" style="background:var(--color-accent)"></span> Your trip</span>
@@ -95,13 +103,22 @@ export default function passengerView(container) {
   const liveLayer = new LiveRidesLayer(map, { onSelect: (ride) => setActive(ride.id) });
   const countNode = container.querySelector('[data-live-count]');
 
-  api.liveRides()
-    .then(({ rides, count }) => {
-      liveLayer.render(rides, { showRoutes: false });
-      countNode.textContent = `${count} traveller${count === 1 ? '' : 's'} live`;
-      if (count) liveLayer.fit();
-    })
-    .catch(() => { countNode.textContent = 'Live map unavailable'; });
+  container.querySelector('[data-map-sos]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    toggleSirenSound(true); // START SIREN SOUND IMMEDIATELY ON CLICK
+    setBusy(button, true, 'SOS…');
+    try {
+      const { locateUser } = await import('../map.js');
+      const [lat, lng] = await locateUser();
+      const res = await api.triggerSos({ user_id: user.id, latitude: lat, longitude: lng, location_name: 'Map Overlay Emergency SOS' });
+      openSosEmergencyModal({ res });
+    } catch {
+      const res = await api.triggerSos({ user_id: user.id, latitude: 12.9716, longitude: 77.5946, location_name: 'Map Overlay Emergency SOS' });
+      openSosEmergencyModal({ res });
+    } finally {
+      setBusy(button, false);
+    }
+  });
 
   function drawTrip() {
     const pickup = pickupField.value;
@@ -196,6 +213,7 @@ export default function passengerView(container) {
         drop_lng: drop.lng,
         seats,
         max_detour_m: maxDetour,
+        women_only_filter: container.querySelector('#pax-women-only').checked,
       });
 
       matches = result.matches;
@@ -215,7 +233,7 @@ export default function passengerView(container) {
   function setActive(rideId) {
     activeId = rideId;
     container.querySelectorAll('[data-ride-card]').forEach((card) => {
-      card.classList.toggle('is-active', Number(card.dataset.rideCard) === rideId);
+      card.classList.toggle('is-active', String(card.dataset.rideCard) === String(rideId));
     });
     liveLayer.highlight(rideId);
     container.querySelector(`[data-ride-card="${rideId}"]`)?.scrollIntoView({
@@ -223,9 +241,51 @@ export default function passengerView(container) {
     });
   }
 
-  function matchCard(ride, seats) {
-    const trust = trustBadge(ride.rider_trust_score);
+   function matchCard(ride, seats) {
+    const trust = trustBadge(ride.rider_trust_score ?? 50);
     const percent = Math.round(ride.match_percentage);
+
+    if (ride.is_relay) {
+      return `
+        <article class="ride-card ride-card-relay" tabindex="0" data-ride-card="${ride.id}" style="border: 1px solid var(--accent-primary, #6366f1); background: rgba(99, 102, 241, 0.04);">
+          <div class="row-tight" style="justify-content:space-between;margin-bottom:8px">
+            <span class="badge badge-info" style="background:#6366f1;color:#fff;font-weight:600">${icon('git-commit', 12)} 🔀 2-Leg Relay Carpool</span>
+            <div style="text-align:right">
+              <div style="font-family:var(--font-display);font-size:var(--text-lg);font-weight:600">${rupees(ride.fare)}</div>
+              <div class="xsmall muted">Total for ${seats} seat${seats === 1 ? '' : 's'}</div>
+            </div>
+          </div>
+
+          <div class="route-line" style="gap:4px">
+            <div class="route-step"><span class="dot"></span><span><strong>Leg 1:</strong> ${escapeHtml(ride.leg1.rider_name)} (${escapeHtml(ride.leg1.origin)})</span></div>
+            <div class="route-step via" style="padding-left:14px"><span class="badge badge-secondary" style="font-size:11px">📍 Transfer Hub: ${escapeHtml(ride.transfer_point.name)}</span></div>
+            <div class="route-step to"><span class="dot"></span><span><strong>Leg 2:</strong> ${escapeHtml(ride.leg2.rider_name)} (${escapeHtml(ride.leg2.destination)})</span></div>
+          </div>
+
+          <div style="margin-top:8px">
+            <div class="row-tight" style="justify-content:space-between;margin-bottom:6px">
+              <span class="xsmall muted">Combined Route overlap</span>
+              <span class="xsmall"><strong>${percent}%</strong> of your trip</span>
+            </div>
+            <div class="meter"><span style="width:${percent}%;background:#6366f1"></span></div>
+          </div>
+
+          <div class="ride-meta" style="margin-top:8px">
+            <span>${icon('navigation', 13)} ${km(ride.pickup_detour_m)} to pickup</span>
+            <span>${icon('users', 13)} ${ride.seats_available} free</span>
+            <span>${icon('leaf', 13)} ${Number(ride.carbon_savings_kg || 0).toFixed(2)} kg CO₂ saved</span>
+          </div>
+
+          <div class="row-tight" style="justify-content:space-between;margin-top:10px">
+            <span class="badge ${trust.className}">${icon('shield', 12)} Relay Verified · ${ride.rider_trust_score ?? '—'}/100</span>
+            <button class="btn btn-primary btn-sm" data-book-relay="${ride.id}" style="background:#6366f1">
+              ${icon('ticket', 14)} Book 2-Leg Relay
+            </button>
+          </div>
+        </article>
+      `;
+    }
+
     return `
       <article class="ride-card" tabindex="0" data-ride-card="${ride.id}"
                aria-label="Ride by ${escapeHtml(ride.rider_name)}, ${percent} percent of your route">
@@ -234,6 +294,7 @@ export default function passengerView(container) {
           <div style="flex:1;min-width:0">
             <div class="row-tight" style="gap:var(--space-2)">
               <strong>${escapeHtml(ride.rider_name)}</strong>
+              ${ride.women_only ? `<span class="badge badge-women-only">🌸 Women-Only</span>` : ''}
               ${ride.rider_verified ? `<span class="badge badge-success">${icon('shield', 12)} Verified</span>` : ''}
             </div>
             <div class="xsmall muted">
@@ -297,9 +358,9 @@ export default function passengerView(container) {
     `;
 
     resultsNode.querySelectorAll('[data-ride-card]').forEach((card) => {
-      const rideId = Number(card.dataset.rideCard);
+      const rideId = card.dataset.rideCard;
       card.addEventListener('click', (event) => {
-        if (event.target.closest('[data-book]')) return;
+        if (event.target.closest('[data-book]') || event.target.closest('[data-book-relay]')) return;
         setActive(rideId);
       });
       card.addEventListener('keydown', (event) => {
@@ -313,26 +374,87 @@ export default function passengerView(container) {
         book(Number(button.dataset.book), button, seats);
       });
     });
+
+    resultsNode.querySelectorAll('[data-book-relay]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const relayId = button.dataset.bookRelay;
+        const relayMatch = matches.find((m) => String(m.id) === String(relayId));
+        if (relayMatch) bookRelayRide(relayMatch, button, seats);
+      });
+    });
+  }
+
+  function extractLocationDetails(fieldVal, defaultLabel = 'Location', defaultLat = 16.43, defaultLng = 74.59) {
+    if (!fieldVal) return { label: defaultLabel, lat: defaultLat, lng: defaultLng };
+    if (typeof fieldVal === 'string') {
+      return { label: fieldVal, lat: defaultLat, lng: defaultLng };
+    }
+    const label = fieldVal.short || fieldVal.label || fieldVal.name || String(fieldVal) || defaultLabel;
+    const lat = Number(fieldVal.lat ?? fieldVal.latitude ?? defaultLat);
+    const lng = Number(fieldVal.lng ?? fieldVal.longitude ?? defaultLng);
+    return {
+      label,
+      lat: Number.isFinite(lat) ? lat : defaultLat,
+      lng: Number.isFinite(lng) ? lng : defaultLng,
+    };
+  }
+
+  async function bookRelayRide(relayMatch, button, seats) {
+    const paxId = Number(user?.id || store.user?.id || 1);
+    const pickupObj = extractLocationDetails(pickupField.value, 'Pickup', 16.43, 74.59);
+    const dropObj = extractLocationDetails(dropField.value, 'Dropoff', 15.87, 74.50);
+    const maxDetour = Number(container.querySelector('#pax-detour').value) || 5000;
+
+    setBusy(button, true, 'Booking 2 Legs…');
+    try {
+      const created = await api.bookRelay({
+        passenger_id: paxId,
+        leg1_ride_id: Number(relayMatch.leg1.id),
+        leg2_ride_id: Number(relayMatch.leg2.id),
+        pickup: pickupObj.label,
+        dropoff: dropObj.label,
+        transfer_point: relayMatch.transfer_point.name || 'Transfer Hub',
+        pickup_lat: pickupObj.lat,
+        pickup_lng: pickupObj.lng,
+        transfer_lat: Number(relayMatch.transfer_point.lat),
+        transfer_lng: Number(relayMatch.transfer_point.lng),
+        drop_lat: dropObj.lat,
+        drop_lng: dropObj.lng,
+        seats: Number(seats) || 1,
+        max_detour_m: maxDetour,
+      });
+      toast(`Relay Seats requested! Start codes: ${created.otp}`, 'success', 8000);
+      navigate(`/trip?id=${created.id}`);
+    } catch (error) {
+      toast(error.message, 'error');
+      setBusy(button, false);
+    }
   }
 
   async function book(rideId, button, seats) {
-    const pickup = pickupField.value;
-    const drop = dropField.value;
-    if (!pickup || !drop) return;
-    const maxDetour = Number(container.querySelector('#pax-detour').value);
+    const targetMatch = matches.find((m) => String(m.id) === String(rideId));
+    if (targetMatch && targetMatch.is_relay) {
+      return bookRelayRide(targetMatch, button, seats);
+    }
+
+    const paxId = Number(user?.id || store.user?.id || 1);
+    const pickupObj = extractLocationDetails(pickupField.value, 'Pickup', 16.43, 74.59);
+    const dropObj = extractLocationDetails(dropField.value, 'Dropoff', 15.87, 74.50);
+    const maxDetour = Number(container.querySelector('#pax-detour').value) || 5000;
 
     setBusy(button, true, 'Booking…');
     try {
       const created = await api.book({
-        ride_id: rideId,
-        passenger_id: user.id,
-        pickup: pickup.short || pickup.label,
-        dropoff: drop.short || drop.label,
-        pickup_lat: pickup.lat,
-        pickup_lng: pickup.lng,
-        drop_lat: drop.lat,
-        drop_lng: drop.lng,
-        seats,
+        ride_id: Number(rideId),
+        passenger_id: paxId,
+        pickup: pickupObj.label,
+        dropoff: dropObj.label,
+        pickup_lat: pickupObj.lat,
+        pickup_lng: pickupObj.lng,
+        drop_lat: dropObj.lat,
+        drop_lng: dropObj.lng,
+        seats: Number(seats) || 1,
         max_detour_m: maxDetour,
       });
       toast(`Seat requested — your start code is ${created.otp}`, 'success', 6000);

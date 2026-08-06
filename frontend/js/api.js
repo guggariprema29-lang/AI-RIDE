@@ -151,6 +151,9 @@ export const api = {
   searchSchedules: (gender = 'unspecified', womenOnly = false) => request(`/schedules/search?passenger_gender=${gender}&women_only_filter=${womenOnly}`),
   toggleSchedule: (id) => request(`/schedules/${id}/toggle`, { method: 'POST', body: {} }),
   subscribeSchedule: (id, payload) => request(`/schedules/${id}/subscribe`, { method: 'POST', body: payload }),
+
+  rideCostBreakdown: (rideId) => request(`/rides/${rideId}/cost-breakdown`),
+  calculateCostBreakdown: (payload) => request('/cost-breakdown/calculate', { method: 'POST', body: payload }),
 };
 
 export function connectNotificationWS(userId, onMessage) {

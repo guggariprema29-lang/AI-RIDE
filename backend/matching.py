@@ -353,3 +353,58 @@ def ride_distance_m(ride: dict) -> float:
         (float(ride["origin_lat"]), float(ride["origin_lng"])),
         (float(ride["dest_lat"]), float(ride["dest_lng"])),
     )
+
+
+def calculate_cost_savings(distance_m: float, vehicle_type: str = "car", seats: int = 1, is_parcel: bool = False, actual_fare: float = None) -> dict:
+    """
+    Calculates fuel consumption, zero-commission cost-share, and savings vs commercial taxis (Uber/Ola) or couriers (Porter/Dunzo).
+    """
+    distance_km = max(0.5, round(distance_m / 1000.0, 1))
+    fuel_price_per_liter = 102.0  # INR per liter
+    mileage_kpl = 15.0 if vehicle_type.lower() == "car" else 45.0
+    
+    fuel_liters = round(distance_km / mileage_kpl, 2)
+    total_fuel_cost = round(fuel_liters * fuel_price_per_liter, 2)
+    
+    if actual_fare is not None and actual_fare > 0:
+        cost_share = float(actual_fare)
+    else:
+        rate_per_km = 6.0 if vehicle_type.lower() == "car" else 3.0
+        cost_share = round((distance_km * rate_per_km) * seats, 2)
+        
+    rider_fuel_offset = min(total_fuel_cost, round(cost_share, 2))
+    
+    if is_parcel:
+        # Commercial Courier Rate (Porter/Dunzo): Base ₹40 + ₹15/km
+        commercial_name = "Porter / Dunzo Courier"
+        commercial_fare = round(40.0 + (distance_km * 15.0), 2)
+    else:
+        if vehicle_type.lower() == "car":
+            # Commercial Taxi Rate (Uber / Ola Sedan): Base ₹50 + ₹18/km + time charge
+            commercial_name = "Uber / Ola Cab"
+            commercial_fare = round(50.0 + (distance_km * 18.0) + (distance_km * 1.5 * 2.0), 2)
+        else:
+            # Commercial Bike Taxi Rate (Rapido / Uber Moto): Base ₹30 + ₹10/km
+            commercial_name = "Uber Moto / Rapido"
+            commercial_fare = round(30.0 + (distance_km * 10.0), 2)
+            
+    savings_amount = max(0.0, round(commercial_fare - cost_share, 2))
+    savings_pct = round((savings_amount / commercial_fare) * 100) if commercial_fare > 0 else 0
+    co2_saved_kg = round(distance_km * 0.15, 2)
+    
+    return {
+        "distance_km": distance_km,
+        "vehicle_type": vehicle_type,
+        "fuel_price_per_liter": fuel_price_per_liter,
+        "mileage_kpl": mileage_kpl,
+        "fuel_liters": fuel_liters,
+        "total_fuel_cost": total_fuel_cost,
+        "cost_share": cost_share,
+        "rider_fuel_offset": rider_fuel_offset,
+        "commercial_name": commercial_name,
+        "commercial_fare": commercial_fare,
+        "savings_amount": savings_amount,
+        "savings_pct": max(0, min(95, savings_pct)),
+        "co2_saved_kg": co2_saved_kg,
+        "is_parcel": is_parcel
+    }

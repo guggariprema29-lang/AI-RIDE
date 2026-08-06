@@ -9,6 +9,7 @@ import { placeInput } from '../components/place-input.js';
 import {
   escapeHtml, initials, km, localDateTimeValue, setBusy, statusBadge, timeLabel, toast,
 } from '../ui.js';
+import { showCostBreakdownModal } from '../components/cost-modal.js';
 
 const VEHICLES = [
   { id: 'bike', label: 'Bike', seats: 1, rate: 3.5 },
@@ -323,7 +324,10 @@ export default function riderView(container) {
           <span>${icon('route', 13)} ${km(ride.total_distance_m)}</span>
         </div>
         ${closed ? '' : `
-          <div class="row-tight" style="margin-top:var(--space-3)">
+          <div class="row-tight" style="margin-top:var(--space-3);flex-wrap:wrap">
+            <button class="btn btn-xs btn-ghost" data-view-rider-receipt="${ride.id}" style="color:var(--color-accent)">
+              ${icon('file-text', 12)} 📊 Fuel & Savings Receipt
+            </button>
             <button class="btn btn-sm" data-locate-ride="${ride.id}">${icon('crosshair', 14)} Update location</button>
             ${canStart ? `<button class="btn btn-sm btn-primary" data-status="started" data-id="${ride.id}">${icon('navigation', 14)} Start trip</button>` : ''}
             ${canComplete ? `<button class="btn btn-sm btn-primary" data-status="completed" data-id="${ride.id}">${icon('check', 14)} Complete</button>` : ''}
@@ -432,6 +436,18 @@ export default function riderView(container) {
 
     container.querySelectorAll('[data-trip]').forEach((button) => {
       button.addEventListener('click', () => navigate(`/trip?id=${button.dataset.trip}`));
+    });
+
+    container.querySelectorAll('[data-view-rider-receipt]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const rideId = Number(button.dataset.viewRiderReceipt);
+        try {
+          const res = await api.rideCostBreakdown(rideId);
+          showCostBreakdownModal(res);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
     });
   }
 

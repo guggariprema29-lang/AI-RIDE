@@ -6,6 +6,7 @@ import { store, rememberTrip, recentTrips } from '../store.js';
 import { navigate } from '../router.js';
 import { createMap, RoutePreview, LiveRidesLayer } from '../map.js';
 import { placeInput } from '../components/place-input.js';
+import { showCostBreakdownModal } from '../components/cost-modal.js';
 import {
   emptyState, escapeHtml, initials, km, rupees, setBusy, skeletonList,
   timeLabel, toast, trustBadge, openSosEmergencyModal, toggleSirenSound,
@@ -390,8 +391,10 @@ export default function passengerView(container) {
           <span>${icon('leaf', 13)} ${Number(ride.carbon_savings_kg || 0).toFixed(2)} kg CO₂ saved</span>
         </div>
 
-        <div class="row-tight" style="justify-content:space-between">
-          <span class="badge ${trust.className}">${icon('shield', 12)} ${trust.label} · ${ride.rider_trust_score ?? '—'}/100</span>
+        <div class="row-tight" style="justify-content:space-between;margin-top:var(--space-2)">
+          <button class="btn btn-xs btn-ghost" data-view-receipt="${ride.id}" style="color:var(--color-accent)">
+            ${icon('file-text', 12)} 📊 View Fuel & Savings Receipt
+          </button>
           <button class="btn btn-primary btn-sm" data-book="${ride.id}">
             ${icon('ticket', 14)} Book seat
           </button>
@@ -421,11 +424,26 @@ export default function passengerView(container) {
     resultsNode.querySelectorAll('[data-ride-card]').forEach((card) => {
       const rideId = card.dataset.rideCard;
       card.addEventListener('click', (event) => {
-        if (event.target.closest('[data-book]') || event.target.closest('[data-book-relay]')) return;
+        if (event.target.closest('[data-book]') || event.target.closest('[data-book-relay]') || event.target.closest('[data-view-receipt]')) return;
         setActive(rideId);
       });
       card.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setActive(rideId); }
+      });
+    });
+
+    resultsNode.querySelectorAll('[data-view-receipt]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const rideId = Number(button.dataset.viewReceipt);
+        const match = matches.find((m) => String(m.id) === String(rideId));
+        showCostBreakdownModal({
+          distance_m: match?.total_distance_m || 10000.0,
+          vehicle_type: match?.vehicle_type || 'car',
+          seats: seats,
+          actual_fare: match?.fare,
+          title: `Receipt (${match?.origin?.split(',')[0] || ''} ➔ ${match?.destination?.split(',')[0] || ''})`
+        });
       });
     });
 

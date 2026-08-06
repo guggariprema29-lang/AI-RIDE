@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { el, escapeHtml, toast } from '../ui.js';
 import { placeInput } from '../components/place-input.js';
+import { showCostBreakdownModal } from '../components/cost-modal.js';
 
 export default async function parcelView(container) {
   const user = store.user;
@@ -441,7 +442,10 @@ async function renderDeliverParcels(parent) {
                     <div><strong>Payout:</strong> <span style="color:var(--color-success);font-weight:bold;font-size:var(--text-md)">₹${p.fare}</span></div>
                   </div>
 
-                  <div class="row-tight" style="justify-content:flex-end">
+                  <div class="row-tight" style="justify-content:space-between">
+                    <button class="btn btn-xs btn-ghost" data-view-parcel-receipt="${p.id}" style="color:var(--color-accent)">
+                      ${icon('file-text', 12)} 📊 View Fuel & Savings Receipt
+                    </button>
                     <button class="btn btn-primary btn-sm" data-accept-parcel="${p.id}">
                       ${icon('check', 14)} Accept Delivery Job (Earn ₹${p.fare})
                     </button>
@@ -453,6 +457,20 @@ async function renderDeliverParcels(parent) {
         </div>
       </div>
     `;
+
+    parent.querySelectorAll('[data-view-parcel-receipt]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.dataset.viewParcelReceipt);
+        const job = jobs.find((j) => Number(j.id) === id);
+        showCostBreakdownModal({
+          distance_m: job?.distance_m || 8000.0,
+          vehicle_type: 'car',
+          is_parcel: true,
+          actual_fare: job?.fare,
+          title: `Courier Receipt (${job?.title || 'Parcel'})`
+        });
+      });
+    });
 
     parent.querySelectorAll('[data-accept-parcel]').forEach((btn) => {
       btn.addEventListener('click', async (e) => {

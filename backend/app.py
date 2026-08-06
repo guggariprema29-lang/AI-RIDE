@@ -70,7 +70,7 @@ from parcels import (
     create_parcels_table, create_parcel, get_parcels_by_sender, get_parcels_for_rider,
     get_nearby_parcels_for_ride, accept_parcel, verify_parcel_pickup, verify_parcel_delivery, cancel_parcel
 )
-from matching import rank_rides, ride_distance_m, VEHICLE_DEFAULT_RATE
+from matching import rank_rides, ride_distance_m, calculate_cost_savings, VEHICLE_DEFAULT_RATE
 from datetime import datetime, timedelta
 from route_engine import overlap_score, route_length, calculate_detour, calculate_overlap_score, detect_route_deviation
 from cost_sharing import calculate_cost_split
@@ -1144,3 +1144,23 @@ def subscribe_recurring_schedule_endpoint(schedule_id: int, req: RecurringSubscr
 def trigger_schedule_generation_endpoint():
     result = process_recurring_schedules()
     return result
+
+
+@app.get("/rides/{ride_id}/cost-breakdown")
+def get_ride_cost_breakdown(ride_id: int):
+    ride = get_ride(ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found.")
+    dist_m = ride_distance_m(ride)
+    vehicle = ride.get("vehicle_type", "car")
+    return calculate_cost_savings(distance_m=dist_m, vehicle_type=vehicle)
+
+
+@app.post("/cost-breakdown/calculate")
+def calculate_cost_breakdown_endpoint(req: dict):
+    dist_m = float(req.get("distance_m", 10000.0))
+    vehicle = str(req.get("vehicle_type", "car"))
+    seats = int(req.get("seats", 1))
+    is_parcel = bool(req.get("is_parcel", False))
+    actual_fare = float(req.get("actual_fare")) if req.get("actual_fare") is not None else None
+    return calculate_cost_savings(distance_m=dist_m, vehicle_type=vehicle, seats=seats, is_parcel=is_parcel, actual_fare=actual_fare)

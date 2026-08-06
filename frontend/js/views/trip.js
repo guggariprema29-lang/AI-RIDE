@@ -8,6 +8,7 @@ import { store } from '../store.js';
 import { navigate } from '../router.js';
 import { createMap, TripMap } from '../map.js';
 import { escapeHtml, initials, km, rupees, setBusy, timeLabel, toast, openSosEmergencyModal, toggleSirenSound } from '../ui.js';
+import { showCostBreakdownModal } from '../components/cost-modal.js';
 
 const STAGES = [
   { key: 'pending', label: 'Requested' },
@@ -154,6 +155,11 @@ export default function tripView(container, query) {
         <div><span class="label">Seats</span><strong>${booking.seats}</strong></div>
         <div><span class="label">Vehicle</span><strong>${escapeHtml(booking.vehicle_type || '—')}${booking.vehicle_number ? ` · ${escapeHtml(booking.vehicle_number)}` : ''}</strong></div>
         <div><span class="label">Departs</span><strong>${escapeHtml(timeLabel(booking.ride_departure_time))}</strong></div>
+        <div style="grid-column: 1 / -1; margin-top: var(--space-2); text-align: center;">
+          <button class="btn btn-xs btn-ghost" data-view-trip-receipt style="color:var(--color-accent);font-weight:600">
+            📊 View Detailed Fuel & Eco Savings Receipt
+          </button>
+        </div>
       </div>
     `;
   }
@@ -435,6 +441,16 @@ export default function tripView(container, query) {
         toast(error.message, 'error');
         setBusy(button, false);
       }
+    });
+
+    bodyNode.querySelector('[data-view-trip-receipt]')?.addEventListener('click', () => {
+      showCostBreakdownModal({
+        distance_m: legDistance() || 10000.0,
+        vehicle_type: booking.vehicle_type || 'car',
+        seats: booking.seats || 1,
+        actual_fare: booking.fare,
+        title: `Trip Receipt (${booking.pickup?.split(',')[0] || ''} ➔ ${booking.dropoff?.split(',')[0] || ''})`
+      });
     });
 
     // Star rating

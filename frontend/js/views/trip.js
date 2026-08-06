@@ -336,7 +336,15 @@ export default function tripView(container, query) {
 
   function render() {
     renderRail();
+    const dev = rideData?.route_deviation;
+    const deviationBanner = dev && dev.is_deviated ? `
+      <div class="${dev.is_critical ? 'off-route-banner-critical' : 'off-route-banner-warning'}" style="margin-bottom:var(--space-4)">
+        ${escapeHtml(dev.message || `⚠️ Vehicle off-route by ${dev.deviation_distance_m}m`)}
+      </div>
+    ` : '';
+
     bodyNode.innerHTML = `
+      ${deviationBanner}
       ${personCard()}
       ${routeCard()}
       ${tripFacts()}

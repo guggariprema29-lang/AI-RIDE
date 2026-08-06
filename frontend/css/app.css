@@ -2017,3 +2017,35 @@ input[aria-invalid="true"] { border-color: var(--color-destructive); }
   border: 1px solid rgba(236, 72, 153, 0.4);
   font-weight: 600;
 }
+
+.off-route-banner-warning {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.25));
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+  animation: pulse-warning 2s infinite alternate;
+}
+
+.off-route-banner-critical {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.35), rgba(185, 28, 28, 0.35));
+  color: #fca5a5;
+  border: 2px solid #ef4444;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-weight: bold;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.6);
+  animation: pulse-critical 1s infinite alternate;
+}
+
+@keyframes pulse-warning {
+  from { opacity: 0.85; }
+  to { opacity: 1.0; }
+}
+
+@keyframes pulse-critical {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(1.01); opacity: 1.0; }
+}

@@ -299,6 +299,13 @@ export default function riderView(container) {
     const canStart = ride.status === 'available';
     const canComplete = ride.status === 'started';
     const closed = ['completed', 'cancelled'].includes(ride.status);
+    const dev = ride.route_deviation;
+    const deviationHtml = dev && dev.is_deviated ? `
+      <div class="${dev.is_critical ? 'off-route-banner-critical' : 'off-route-banner-warning'}" style="margin-top:var(--space-2)">
+        ${escapeHtml(dev.message || `⚠️ Vehicle off-route by ${dev.deviation_distance_m}m`)}
+      </div>
+    ` : '';
+
     return `
       <article class="card card-tight" data-ride="${ride.id}">
         <div class="row-tight" style="justify-content:space-between">
@@ -309,6 +316,7 @@ export default function riderView(container) {
           </span>
           <span class="badge ${statusBadge(ride.status)}">${escapeHtml(ride.status)}</span>
         </div>
+        ${deviationHtml}
         <div class="ride-meta" style="margin-top:var(--space-2)">
           <span>${icon('clock', 13)} ${escapeHtml(timeLabel(ride.departure_time))}</span>
           <span>${icon('users', 13)} ${ride.seats_available}/${ride.seats_total} free</span>

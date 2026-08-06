@@ -542,12 +542,15 @@ def push_ride_location(ride_id: int, req: RideLocationUpdate):
     if not ride:
         raise HTTPException(status_code=404, detail="Ride not found.")
 
-    # Check for route deviation
     polyline = ride.get("polyline") or []
-    deviation_info = detect_route_deviation((req.latitude, req.longitude), polyline, threshold_m=500.0)
+    deviation_info = detect_route_deviation(
+        (req.latitude, req.longitude),
+        polyline,
+        threshold_m=500.0,
+        critical_threshold_m=2000.0
+    )
 
     if deviation_info["is_deviated"]:
-        # Increment rider's route deviation count and recalculate trust
         rider_id = ride["rider_id"]
         conn = get_connection()
         try:
@@ -560,6 +563,19 @@ def push_ride_location(ride_id: int, req: RideLocationUpdate):
         finally:
             conn.close()
         recalculate_user_trust(rider_id)
+
+        # Critical threshold (>=2 km): Auto-dispatch Emergency SOS!
+        if deviation_info.get("is_critical"):
+            from sos import trigger_sos
+            dist_km = round(deviation_info["deviation_distance_m"] / 1000.0, 1)
+            sos_res = trigger_sos(
+                user_id=rider_id,
+                latitude=req.latitude,
+                longitude=req.longitude,
+                location_name=f"Auto-SOS: Vehicle deviated {dist_km} km off-route (Ride #{ride_id})"
+            )
+            deviation_info["auto_sos_triggered"] = True
+            deviation_info["sos_alert"] = sos_res
 
     ride["route_deviation"] = deviation_info
     return ride

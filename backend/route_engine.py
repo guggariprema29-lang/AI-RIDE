@@ -123,18 +123,47 @@ def calculate_overlap_score(traveler_polyline: List[dict], parcel_polyline: List
     return min(1.0, common_length / total_length) if total_length > 0 else 0.0
 
 
-def detect_route_deviation(current_pos: tuple[float, float], route: List[dict], threshold_m: float = 500.0) -> dict:
+def detect_route_deviation(current_pos: tuple[float, float], route: List[dict], threshold_m: float = 500.0, critical_threshold_m: float = 2000.0) -> dict:
     """
-    Checks if a rider's live position (lat, lng) has deviated from their registered polyline beyond threshold_m.
-    Returns: {"is_deviated": bool, "deviation_distance_m": float, "threshold_m": float}
+    Checks if a rider's live position (lat, lng) has deviated from their registered polyline beyond threshold_m (500m warning) or critical_threshold_m (2000m / 2km Auto-SOS).
+    Returns: {"is_deviated": bool, "is_critical": bool, "deviation_distance_m": float, "warning_level": str, "message": str}
     """
     if not route or len(route) < 2:
-        return {"is_deviated": False, "deviation_distance_m": 0.0, "threshold_m": threshold_m}
+        return {
+            "is_deviated": False,
+            "is_critical": False,
+            "deviation_distance_m": 0.0,
+            "warning_level": "normal",
+            "message": "",
+            "threshold_m": threshold_m,
+            "critical_threshold_m": critical_threshold_m
+        }
 
     dist = minimum_distance_to_route(current_pos, route)
-    is_deviated = (dist != float("inf")) and (dist > threshold_m)
+    if dist == float("inf"):
+        dist = 0.0
+
+    dist_rounded = round(dist, 1)
+    is_deviated = dist > threshold_m
+    is_critical = dist >= critical_threshold_m
+
+    if is_critical:
+        warning_level = "critical"
+        dist_km = round(dist / 1000.0, 1)
+        message = f"🚨 CRITICAL SAFETY ALERT: Vehicle deviated {dist_km} km off-route! Emergency Auto-SOS dispatched!"
+    elif is_deviated:
+        warning_level = "warning"
+        message = f"⚠️ Vehicle off-route by {int(dist_rounded)}m"
+    else:
+        warning_level = "normal"
+        message = ""
+
     return {
         "is_deviated": is_deviated,
-        "deviation_distance_m": round(dist, 1) if dist != float("inf") else 0.0,
-        "threshold_m": threshold_m
+        "is_critical": is_critical,
+        "deviation_distance_m": dist_rounded,
+        "warning_level": warning_level,
+        "message": message,
+        "threshold_m": threshold_m,
+        "critical_threshold_m": critical_threshold_m
     }

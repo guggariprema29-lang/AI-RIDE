@@ -8,7 +8,7 @@ import { createMap, RoutePreview, LiveRidesLayer } from '../map.js';
 import { placeInput } from '../components/place-input.js';
 import { showCostBreakdownModal } from '../components/cost-modal.js';
 import {
-  emptyState, escapeHtml, initials, km, rupees, setBusy, skeletonList,
+  emptyState, escapeHtml, formatCapacity, initials, km, rupees, setBusy, skeletonList,
   timeLabel, toast, trustBadge, openSosEmergencyModal, toggleSirenSound,
 } from '../ui.js';
 
@@ -334,19 +334,21 @@ export default function passengerView(container) {
 
           <div class="ride-meta" style="margin-top:8px">
             <span>${icon('navigation', 13)} ${km(ride.pickup_detour_m)} to pickup</span>
-            <span>${icon('users', 13)} ${ride.seats_available} free</span>
+            <span>${formatCapacity(ride.seats_available, ride.seats_total, ride.vehicle_type)}</span>
             <span>${icon('leaf', 13)} ${Number(ride.carbon_savings_kg || 0).toFixed(2)} kg CO₂ saved</span>
           </div>
 
           <div class="row-tight" style="justify-content:space-between;margin-top:10px">
             <span class="badge ${trust.className}">${icon('shield', 12)} Relay Verified · ${ride.rider_trust_score ?? '—'}/100</span>
-            <button class="btn btn-primary btn-sm" data-book-relay="${ride.id}" style="background:#6366f1">
-              ${icon('ticket', 14)} Book 2-Leg Relay
-            </button>
+            ${(ride.seats_available || 0) < seats
+              ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.6;cursor:not-allowed">❌ No seats available</button>`
+              : `<button class="btn btn-primary btn-sm" data-book-relay="${ride.id}" style="background:#6366f1">${icon('ticket', 14)} Book 2-Leg Relay</button>`}
           </div>
         </article>
       `;
     }
+
+    const isFull = (ride.seats_available || 0) < seats;
 
     return `
       <article class="ride-card" tabindex="0" data-ride-card="${ride.id}"
@@ -387,7 +389,7 @@ export default function passengerView(container) {
           <span>${icon(vehicleIconName(ride.vehicle_type), 13)} ${escapeHtml(ride.vehicle_type)}</span>
           <span>${icon('clock', 13)} ${escapeHtml(timeLabel(ride.departure_time))}</span>
           <span>${icon('navigation', 13)} ${km(ride.pickup_detour_m)} to pickup</span>
-          <span>${icon('users', 13)} ${ride.seats_available} free</span>
+          <span>${formatCapacity(ride.seats_available, ride.seats_total, ride.vehicle_type)}</span>
           <span>${icon('leaf', 13)} ${Number(ride.carbon_savings_kg || 0).toFixed(2)} kg CO₂ saved</span>
         </div>
 
@@ -395,9 +397,9 @@ export default function passengerView(container) {
           <button class="btn btn-xs btn-ghost" data-view-receipt="${ride.id}" style="color:var(--color-accent)">
             ${icon('file-text', 12)} 📊 View Fuel & Savings Receipt
           </button>
-          <button class="btn btn-primary btn-sm" data-book="${ride.id}">
-            ${icon('ticket', 14)} Book seat
-          </button>
+          ${isFull
+            ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.6;cursor:not-allowed">❌ No seats available</button>`
+            : `<button class="btn btn-primary btn-sm" data-book="${ride.id}">${icon('ticket', 14)} Book seat</button>`}
         </div>
       </article>
     `;

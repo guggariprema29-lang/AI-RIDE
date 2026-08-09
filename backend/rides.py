@@ -30,8 +30,9 @@ CREATE TABLE IF NOT EXISTS rides (
     total_distance_m REAL DEFAULT 0,
     vehicle_type TEXT DEFAULT 'car',
     vehicle_number TEXT,
-    seats_total INTEGER DEFAULT 1,
-    seats_available INTEGER DEFAULT 1,
+    seats_total INTEGER DEFAULT 4,
+    booked_seats INTEGER DEFAULT 0,
+    seats_available INTEGER DEFAULT 4,
     fare_per_km REAL DEFAULT 6.0,
     departure_time TIMESTAMPTZ NOT NULL,
     notes TEXT,
@@ -75,7 +76,7 @@ RIDE_COLUMNS = """
     r.id, r.rider_id, r.origin, r.destination,
     r.origin_lat, r.origin_lng, r.dest_lat, r.dest_lng,
     r.current_lat, r.current_lng, r.polyline, r.total_distance_m,
-    r.vehicle_type, r.vehicle_number, r.seats_total, r.seats_available,
+    r.vehicle_type, r.vehicle_number, r.seats_total, r.booked_seats, r.seats_available,
     r.fare_per_km, r.departure_time, r.notes, r.women_only, r.status, r.created_at, r.updated_at
 """
 
@@ -92,6 +93,9 @@ BOOKING_MIGRATIONS = [
     "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS passenger_rating REAL;",
     "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS passenger_review TEXT;",
     "ALTER TABLE rides ADD COLUMN IF NOT EXISTS women_only BOOLEAN DEFAULT FALSE;",
+    "ALTER TABLE rides ADD COLUMN IF NOT EXISTS booked_seats INTEGER DEFAULT 0;",
+    "UPDATE rides SET booked_seats = COALESCE((SELECT SUM(seats) FROM bookings WHERE ride_id = rides.id AND status NOT IN ('cancelled', 'rejected')), 0);",
+    "UPDATE rides SET seats_available = GREATEST(0, seats_total - booked_seats);",
 ]
 
 
@@ -132,6 +136,12 @@ def ensure_public_id(user_id: int) -> str:
 
 
 def publish_ride(data: dict) -> dict:
+    vtype = str(data.get("vehicle_type", "car")).lower()
+    default_cap = 1 if vtype == "bike" else (3 if vtype == "auto" else 4)
+    seats_total = int(data.get("seats_total") or default_cap)
+    if seats_total <= 0:
+        seats_total = default_cap
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -141,10 +151,10 @@ def publish_ride(data: dict) -> dict:
                     rider_id, origin, destination,
                     origin_lat, origin_lng, dest_lat, dest_lng,
                     current_lat, current_lng, polyline, total_distance_m,
-                    vehicle_type, vehicle_number, seats_total, seats_available,
+                    vehicle_type, vehicle_number, seats_total, booked_seats, seats_available,
                     fare_per_km, departure_time, notes, women_only, status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'available')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s, %s, 'available')
                 RETURNING *;
                 """,
                 (
@@ -159,10 +169,10 @@ def publish_ride(data: dict) -> dict:
                     data.get("current_lng", data["origin_lng"]),
                     json.dumps(data.get("polyline", [])),
                     data.get("total_distance_m", 0.0),
-                    data.get("vehicle_type", "car"),
+                    vtype,
                     data.get("vehicle_number"),
-                    data.get("seats_total", 1),
-                    data.get("seats_total", 1),
+                    seats_total,
+                    seats_total,
                     data.get("fare_per_km", 6.0),
                     data["departure_time"],
                     data.get("notes"),
@@ -283,7 +293,7 @@ def create_booking(data: dict) -> Optional[dict]:
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
-                "SELECT seats_available, status FROM rides WHERE id = %s FOR UPDATE;",
+                "SELECT seats_total, booked_seats, seats_available, status FROM rides WHERE id = %s FOR UPDATE;",
                 (data["ride_id"],),
             )
             ride = cursor.fetchone()
@@ -293,7 +303,13 @@ def create_booking(data: dict) -> Optional[dict]:
             if ride["status"] not in ("available", "started"):
                 conn.rollback()
                 return None
-            if ride["seats_available"] < data.get("seats", 1):
+
+            requested_seats = max(1, int(data.get("seats", 1)))
+            total_seats = int(ride.get("seats_total") or 1)
+            current_booked = int(ride.get("booked_seats") or 0)
+            avail = max(0, total_seats - current_booked)
+
+            if avail < requested_seats:
                 conn.rollback()
                 return None
 
@@ -319,7 +335,7 @@ def create_booking(data: dict) -> Optional[dict]:
                     data["pickup_lng"],
                     data["drop_lat"],
                     data["drop_lng"],
-                    data.get("seats", 1),
+                    requested_seats,
                     data.get("fare", 0.0),
                     data.get("overlap_score", 0.0),
                     data.get("detour_m", 0.0),
@@ -328,9 +344,12 @@ def create_booking(data: dict) -> Optional[dict]:
             )
             booking = cursor.fetchone()
 
+            new_booked = current_booked + requested_seats
+            new_avail = max(0, total_seats - new_booked)
+
             cursor.execute(
-                "UPDATE rides SET seats_available = seats_available - %s, updated_at = NOW() WHERE id = %s;",
-                (data.get("seats", 1), data["ride_id"]),
+                "UPDATE rides SET booked_seats = %s, seats_available = %s, updated_at = NOW() WHERE id = %s;",
+                (new_booked, new_avail, data["ride_id"]),
             )
         conn.commit()
         return dict(booking)
@@ -630,8 +649,14 @@ def update_booking_status(booking_id: int, status: str) -> Optional[dict]:
             )
             if releasing and not already_released:
                 cursor.execute(
-                    "UPDATE rides SET seats_available = seats_available + %s WHERE id = %s;",
-                    (booking["seats"], booking["ride_id"]),
+                    """
+                    UPDATE rides
+                    SET booked_seats = GREATEST(0, booked_seats - %s),
+                        seats_available = GREATEST(0, seats_total - GREATEST(0, booked_seats - %s)),
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (booking["seats"], booking["seats"], booking["ride_id"]),
                 )
                 # Refund escrow back to passenger if held
                 fare = float(booking.get("fare") or 0.0)

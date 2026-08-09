@@ -5,7 +5,7 @@ import { icon, vehicleIconName } from '../icons.js';
 import { store } from '../store.js';
 import { navigate } from '../router.js';
 import {
-  emptyState, escapeHtml, initials, km, rupees, skeletonList,
+  emptyState, escapeHtml, formatCapacity, initials, km, rupees, skeletonList,
   statusBadge, timeLabel,
 } from '../ui.js';
 
@@ -141,7 +141,7 @@ export function myTripsView(container) {
         <div class="ride-meta" style="margin-top:var(--space-3)">
           <span>${icon('clock', 13)} ${escapeHtml(timeLabel(ride.departure_time))}</span>
           <span>${icon('route', 13)} ${km(ride.total_distance_m)}</span>
-          <span>${icon('users', 13)} ${ride.seats_available}/${ride.seats_total} free</span>
+          <span>${formatCapacity(ride.seats_available, ride.seats_total, ride.vehicle_type)}</span>
           <span>${icon('ticket', 13)} ${mine.length} request${mine.length === 1 ? '' : 's'}</span>
           <span>${icon('wallet', 13)} <strong>${rupees(earned)}</strong> shared</span>
         </div>

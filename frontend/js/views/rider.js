@@ -7,7 +7,7 @@ import { navigate } from '../router.js';
 import { createMap, RoutePreview, LiveRidesLayer, locateUser } from '../map.js';
 import { placeInput } from '../components/place-input.js';
 import {
-  escapeHtml, initials, km, localDateTimeValue, setBusy, statusBadge, timeLabel, toast,
+  escapeHtml, formatCapacity, initials, km, localDateTimeValue, setBusy, statusBadge, timeLabel, toast,
 } from '../ui.js';
 import { showCostBreakdownModal } from '../components/cost-modal.js';
 
@@ -59,7 +59,7 @@ export default function riderView(container) {
             <div class="grid grid-2" style="gap:var(--space-3)">
               <div class="field">
                 <label for="seats">Seats free</label>
-                <input id="seats" type="number" min="1" max="6" value="3">
+                <input id="seats" type="number" min="1" max="4" value="4">
               </div>
               <div class="field">
                 <label for="rate">Cost share ₹/km</label>
@@ -320,7 +320,7 @@ export default function riderView(container) {
         ${deviationHtml}
         <div class="ride-meta" style="margin-top:var(--space-2)">
           <span>${icon('clock', 13)} ${escapeHtml(timeLabel(ride.departure_time))}</span>
-          <span>${icon('users', 13)} ${ride.seats_available}/${ride.seats_total} free</span>
+          <span>${formatCapacity(ride.seats_available, ride.seats_total, ride.vehicle_type)}</span>
           <span>${icon('route', 13)} ${km(ride.total_distance_m)}</span>
         </div>
         ${closed ? '' : `

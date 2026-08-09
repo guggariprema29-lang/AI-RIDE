@@ -19,6 +19,7 @@ DEFAULT_MAX_DETOUR_M = 2000.0
 DEFAULT_MIN_OVERLAP = 0.0
 
 VEHICLE_DEFAULT_RATE = {"bike": 3.5, "car": 6.0, "auto": 4.5}
+VEHICLE_DEFAULT_CAPACITY = {"bike": 1, "auto": 3, "car": 4}
 
 EARTH_M_PER_DEG = 111_320.0
 

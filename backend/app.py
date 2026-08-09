@@ -70,7 +70,7 @@ from parcels import (
     create_parcels_table, create_parcel, get_parcels_by_sender, get_parcels_for_rider,
     get_nearby_parcels_for_ride, accept_parcel, verify_parcel_pickup, verify_parcel_delivery, cancel_parcel
 )
-from matching import rank_rides, ride_distance_m, calculate_cost_savings, VEHICLE_DEFAULT_RATE
+from matching import rank_rides, ride_distance_m, calculate_cost_savings, VEHICLE_DEFAULT_RATE, VEHICLE_DEFAULT_CAPACITY
 from datetime import datetime, timedelta
 from route_engine import overlap_score, route_length, calculate_detour, calculate_overlap_score, detect_route_deviation
 from cost_sharing import calculate_cost_split
@@ -493,7 +493,11 @@ def publish_rider_availability(req: RidePublishRequest):
     data = req.dict()
     data["polyline"] = polyline
     data["total_distance_m"] = route_length(polyline)
-    data["fare_per_km"] = req.fare_per_km or VEHICLE_DEFAULT_RATE.get(req.vehicle_type, 6.0)
+    vtype = str(req.vehicle_type or "car").lower()
+    data["vehicle_type"] = vtype
+    data["fare_per_km"] = req.fare_per_km or VEHICLE_DEFAULT_RATE.get(vtype, 6.0)
+    if not data.get("seats_total") or data["seats_total"] <= 0:
+        data["seats_total"] = VEHICLE_DEFAULT_CAPACITY.get(vtype, 4)
     if data.get("current_lat") is None:
         data["current_lat"] = req.origin_lat
         data["current_lng"] = req.origin_lng
@@ -770,7 +774,11 @@ def book_relay_ride(req: RelayBookingCreate):
     b2 = create_booking(b2_data)
 
     if not b1 or not b2:
-        raise HTTPException(status_code=400, detail="Could not book seats on relay rides.")
+        if b1:
+            update_booking_status(b1["id"], "cancelled")
+        if b2:
+            update_booking_status(b2["id"], "cancelled")
+        raise HTTPException(status_code=400, detail="Could not book seats on relay rides. Not enough seats available.")
 
     booking1 = get_booking(b1["id"])
     booking2 = get_booking(b2["id"])

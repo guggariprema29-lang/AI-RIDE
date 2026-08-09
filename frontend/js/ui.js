@@ -58,6 +58,24 @@ export function timeLabel(value) {
   });
 }
 
+export function formatCapacity(seatsAvailable, seatsTotal, vehicleType = 'car') {
+  const type = String(vehicleType || 'car').toLowerCase();
+  const iconMap = {
+    car: '🚗',
+    auto: '🛺',
+    bike: '🏍️',
+  };
+  const vehicleEmoji = iconMap[type] || '🚗';
+  const defaultCap = type === 'bike' ? 1 : (type === 'auto' ? 3 : 4);
+  const total = Number(seatsTotal) || defaultCap;
+  const avail = Math.max(0, Number(seatsAvailable ?? total));
+
+  if (avail <= 0) {
+    return `<span class="capacity-tag full">${vehicleEmoji} 0 / ${total} seats available <span class="badge badge-danger" style="margin-left:4px;font-size:11px;padding:2px 6px">❌ No seats available</span></span>`;
+  }
+  return `<span class="capacity-tag">${vehicleEmoji} ${avail} / ${total} seats available</span>`;
+}
+
 export function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);

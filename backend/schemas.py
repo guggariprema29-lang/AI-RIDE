@@ -170,7 +170,7 @@ class RidePublishRequest(BaseModel):
     polyline: List[RoutePoint] = Field(default_factory=list)
     vehicle_type: str = "car"
     vehicle_number: Optional[str] = None
-    seats_total: int = 1
+    seats_total: Optional[int] = None
     fare_per_km: Optional[float] = None
     departure_time: datetime
     notes: Optional[str] = None

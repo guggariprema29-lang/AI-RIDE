@@ -326,7 +326,7 @@ export default function riderView(container) {
         ${closed ? '' : `
           <div class="row-tight" style="margin-top:var(--space-3);flex-wrap:wrap">
             <button class="btn btn-xs btn-ghost" data-view-rider-receipt="${ride.id}" style="color:var(--color-accent)">
-              ${icon('file-text', 12)} 📊 Fuel & Savings Receipt
+              ${icon('file-text', 12)} 📊 Fuel & Cost Receipt
             </button>
             <button class="btn btn-sm" data-locate-ride="${ride.id}">${icon('crosshair', 14)} Update location</button>
             ${canStart ? `<button class="btn btn-sm btn-primary" data-status="started" data-id="${ride.id}">${icon('navigation', 14)} Start trip</button>` : ''}

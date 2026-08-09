@@ -444,7 +444,7 @@ async function renderDeliverParcels(parent) {
 
                   <div class="row-tight" style="justify-content:space-between">
                     <button class="btn btn-xs btn-ghost" data-view-parcel-receipt="${p.id}" style="color:var(--color-accent)">
-                      ${icon('file-text', 12)} 📊 View Fuel & Savings Receipt
+                      ${icon('file-text', 12)} 📊 View Fuel & Cost Receipt
                     </button>
                     <button class="btn btn-primary btn-sm" data-accept-parcel="${p.id}">
                       ${icon('check', 14)} Accept Delivery Job (Earn ₹${p.fare})

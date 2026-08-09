@@ -157,7 +157,7 @@ export default function tripView(container, query) {
         <div><span class="label">Departs</span><strong>${escapeHtml(timeLabel(booking.ride_departure_time))}</strong></div>
         <div style="grid-column: 1 / -1; margin-top: var(--space-2); text-align: center;">
           <button class="btn btn-xs btn-ghost" data-view-trip-receipt style="color:var(--color-accent);font-weight:600">
-            📊 View Detailed Fuel & Eco Savings Receipt
+            📊 View Detailed Fuel & Cost Receipt
           </button>
         </div>
       </div>

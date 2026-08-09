@@ -9,7 +9,7 @@ export async function showCostBreakdownModal(options = {}) {
     seats = 1,
     is_parcel = false,
     actual_fare = null,
-    title = 'Cost & Fuel Savings Breakdown',
+    title = 'Fuel & Cost Share Breakdown',
   } = options;
 
   // Existing modal cleanup
@@ -96,35 +96,6 @@ export async function showCostBreakdownModal(options = {}) {
         </div>
         <div class="xsmall muted" style="margin-top:2px">
           Rider Total Fuel Bill: <strong>₹${res.total_fuel_cost}</strong> · Rider Offset: <strong>₹${res.rider_fuel_offset}</strong>
-        </div>
-      </div>
-
-      <div class="card stack" style="background:rgba(16, 185, 129, 0.08);border:1px solid rgba(16, 185, 129, 0.3);padding:var(--space-4)">
-        <div class="row-tight" style="justify-content:space-between">
-          <span class="small font-bold" style="color:var(--color-success)">💰 Savings vs ${escapeHtml(res.commercial_name)}</span>
-          <span class="badge badge-success" style="font-weight:bold;font-size:0.95rem">Save ${res.savings_pct}%</span>
-        </div>
-
-        <div class="stack small" style="gap:var(--space-2);margin-top:var(--space-2)">
-          <div>
-            <div class="row-tight" style="justify-content:space-between;margin-bottom:2px">
-              <span>AI Ride (${isParcel ? 'Parcel' : 'Seat'})</span>
-              <strong>₹${res.cost_share}</strong>
-            </div>
-            <div style="height:8px;background:var(--color-success);border-radius:4px;width:100%"></div>
-          </div>
-
-          <div>
-            <div class="row-tight" style="justify-content:space-between;margin-bottom:2px;color:var(--color-foreground-dim)">
-              <span>${escapeHtml(res.commercial_name)}</span>
-              <del>₹${res.commercial_fare}</del>
-            </div>
-            <div style="height:8px;background:rgba(239, 68, 68, 0.4);border-radius:4px;width:100%"></div>
-          </div>
-        </div>
-
-        <div class="xsmall" style="color:var(--color-success);font-weight:bold;margin-top:var(--space-2)">
-          You save ₹${res.savings_amount} compared to commercial ${isParcel ? 'courier services' : 'taxis'}!
         </div>
       </div>
 

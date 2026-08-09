@@ -395,7 +395,7 @@ export default function passengerView(container) {
 
         <div class="row-tight" style="justify-content:space-between;margin-top:var(--space-2)">
           <button class="btn btn-xs btn-ghost" data-view-receipt="${ride.id}" style="color:var(--color-accent)">
-            ${icon('file-text', 12)} 📊 View Fuel & Savings Receipt
+            ${icon('file-text', 12)} 📊 View Fuel & Cost Receipt
           </button>
           ${isFull
             ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.6;cursor:not-allowed">❌ No seats available</button>`

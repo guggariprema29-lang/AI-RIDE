@@ -71,9 +71,9 @@ export function formatCapacity(seatsAvailable, seatsTotal, vehicleType = 'car') 
   const avail = Math.max(0, Number(seatsAvailable ?? total));
 
   if (avail <= 0) {
-    return `<span class="capacity-tag full">${vehicleEmoji} 0 / ${total} seats available <span class="badge badge-danger" style="margin-left:4px;font-size:11px;padding:2px 6px">❌ No seats available</span></span>`;
+    return `<span class="capacity-tag full">${vehicleEmoji} 0 / ${total} passenger seats available <span class="badge badge-danger" style="margin-left:4px;font-size:11px;padding:2px 6px">❌ No seats available</span></span>`;
   }
-  return `<span class="capacity-tag">${vehicleEmoji} ${avail} / ${total} seats available</span>`;
+  return `<span class="capacity-tag">${vehicleEmoji} ${avail} / ${total} passenger seats available</span>`;
 }
 
 export function formatDate(value) {

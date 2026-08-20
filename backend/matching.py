@@ -20,6 +20,7 @@ DEFAULT_MIN_OVERLAP = 0.0
 
 VEHICLE_DEFAULT_RATE = {"bike": 3.5, "car": 6.0, "auto": 4.5}
 VEHICLE_DEFAULT_CAPACITY = {"bike": 1, "auto": 3, "car": 4}
+VEHICLE_TOTAL_SEATS = {"bike": 2, "auto": 4, "car": 5}
 
 EARTH_M_PER_DEG = 111_320.0
 

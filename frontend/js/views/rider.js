@@ -12,9 +12,9 @@ import {
 import { showCostBreakdownModal } from '../components/cost-modal.js';
 
 const VEHICLES = [
-  { id: 'bike', label: 'Bike', seats: 1, rate: 3.5 },
-  { id: 'auto', label: 'Auto', seats: 3, rate: 4.5 },
-  { id: 'car', label: 'Car', seats: 4, rate: 6.0 },
+  { id: 'bike', label: 'Bike (2-Seater: 1 Driver + 1 Pax)', seats: 1, totalSeats: 2, rate: 3.5 },
+  { id: 'auto', label: 'Auto (4-Seater: 1 Driver + 3 Pax)', seats: 3, totalSeats: 4, rate: 4.5 },
+  { id: 'car', label: 'Car (5-Seater: 1 Driver + 4 Pax)', seats: 4, totalSeats: 5, rate: 6.0 },
 ];
 
 export default function riderView(container) {
@@ -47,19 +47,20 @@ export default function riderView(container) {
             <div data-to></div>
 
             <div class="field">
-              <label id="vehicle-label">Vehicle</label>
+              <label id="vehicle-label">Vehicle Type (Seating Capacity)</label>
               <div class="segmented" role="group" aria-labelledby="vehicle-label">
                 ${VEHICLES.map((item) => `
                   <button type="button" data-vehicle="${item.id}" aria-pressed="${item.id === 'car'}">
-                    ${icon(vehicleIconName(item.id), 16)} ${item.label}
+                    ${icon(vehicleIconName(item.id), 16)} ${item.id.toUpperCase()} (${item.totalSeats} seats)
                   </button>`).join('')}
               </div>
             </div>
 
             <div class="grid grid-2" style="gap:var(--space-3)">
               <div class="field">
-                <label for="seats">Seats free</label>
+                <label for="seats">Passenger seats free</label>
                 <input id="seats" type="number" min="1" max="4" value="4">
+                <span class="helper">Driver seat is reserved for you.</span>
               </div>
               <div class="field">
                 <label for="rate">Cost share ₹/km</label>

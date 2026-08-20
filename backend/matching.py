@@ -285,22 +285,23 @@ def rank_rides(
 ) -> list[dict]:
     results = []
     for ride in rides:
-        if ride.get("seats_available", 0) < seats:
-            continue
         score = match_ride(ride, pickup, drop, max_detour_m, min_overlap)
         if not score:
             continue
         merged = dict(ride)
         merged.update(score)
         merged["fare"] = round(score["fare"] * seats, 2)
+        merged["is_full"] = (merged.get("seats_available", 0) < seats)
         results.append(merged)
 
     # Also search for multi-leg relay options
     relay_matches = find_relay_matches(rides, pickup, drop, seats, max_detour_m)
+    for r in relay_matches:
+        r["is_full"] = (r.get("seats_available", 0) < seats)
     results.extend(relay_matches)
 
-    # Closest pickup first, then best overlap, then soonest departure.
-    results.sort(key=lambda r: (r["pickup_detour_m"], -r["overlap_score"], r["departure_time"]))
+    # Available rides first (0 before 1 for is_full), then closest pickup, best overlap, soonest departure.
+    results.sort(key=lambda r: (1 if r.get("is_full") else 0, r["pickup_detour_m"], -r["overlap_score"], r["departure_time"]))
     return annotate_best_matches(results)
 
 

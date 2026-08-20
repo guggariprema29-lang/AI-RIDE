@@ -248,6 +248,26 @@ export default function passengerView(container) {
 
   const form = container.querySelector('form');
   const resultsNode = container.querySelector('[data-results]');
+  let lastSearchParams = null;
+  let pollInterval = null;
+
+  async function executeSearch(isSilent = false) {
+    if (!lastSearchParams) return;
+    if (!isSilent) {
+      resultsNode.innerHTML = skeletonList(3);
+    }
+    try {
+      const result = await api.searchRides(lastSearchParams);
+      matches = result.matches;
+      renderResults(lastSearchParams.seats);
+      liveLayer.render(matches, { showRoutes: true });
+      if (matches.length && !isSilent) liveLayer.fit();
+    } catch (error) {
+      if (!isSilent) {
+        resultsNode.innerHTML = emptyState('alert', 'Search failed', error.message);
+      }
+    }
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -262,33 +282,34 @@ export default function passengerView(container) {
     const button = form.querySelector('button[type="submit"]');
 
     setBusy(button, true, 'Searching…');
-    resultsNode.innerHTML = skeletonList(3);
+
+    lastSearchParams = {
+      passenger_id: user.id,
+      pickup: pickup.short || pickup.label,
+      dropoff: drop.short || drop.label,
+      pickup_lat: pickup.lat,
+      pickup_lng: pickup.lng,
+      drop_lat: drop.lat,
+      drop_lng: drop.lng,
+      seats,
+      max_detour_m: maxDetour,
+      women_only_filter: container.querySelector('#pax-women-only').checked,
+    };
+
+    rememberTrip({ pickup, dropoff: drop });
+    renderRecent();
+    drawTrip();
 
     try {
-      const result = await api.searchRides({
-        passenger_id: user.id,
-        pickup: pickup.short || pickup.label,
-        dropoff: drop.short || drop.label,
-        pickup_lat: pickup.lat,
-        pickup_lng: pickup.lng,
-        drop_lat: drop.lat,
-        drop_lng: drop.lng,
-        seats,
-        max_detour_m: maxDetour,
-        women_only_filter: container.querySelector('#pax-women-only').checked,
-      });
-
-      matches = result.matches;
-      rememberTrip({ pickup, dropoff: drop });
-      renderRecent();
-      renderResults(seats);
-      liveLayer.render(matches, { showRoutes: true });
-      drawTrip();
-      if (matches.length) liveLayer.fit();
-    } catch (error) {
-      resultsNode.innerHTML = emptyState('alert', 'Search failed', error.message);
+      await executeSearch(false);
     } finally {
       setBusy(button, false);
+    }
+
+    if (!pollInterval) {
+      pollInterval = setInterval(() => {
+        executeSearch(true);
+      }, 4000);
     }
   });
 
@@ -548,6 +569,7 @@ export default function passengerView(container) {
 
   return {
     destroy() {
+      if (pollInterval) clearInterval(pollInterval);
       preview.destroy();
       liveLayer.destroy();
       map.remove();

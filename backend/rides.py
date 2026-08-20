@@ -217,7 +217,7 @@ def _rows_with_rider(where: str, params: tuple, limit: Optional[int] = None) -> 
 
 def get_live_rides(limit: int = 200) -> list[dict]:
     return _rows_with_rider(
-        "WHERE r.status IN ('available', 'started') AND r.seats_available > 0",
+        "WHERE r.status IN ('available', 'started')",
         (),
         limit,
     )

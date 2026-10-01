@@ -351,6 +351,10 @@ def create_booking(data: dict) -> Optional[dict]:
                 "UPDATE rides SET booked_seats = %s, seats_available = %s, updated_at = NOW() WHERE id = %s;",
                 (new_booked, new_avail, data["ride_id"]),
             )
+            cursor.execute(
+                "UPDATE users SET total_bookings = total_bookings + 1 WHERE id = %s;",
+                (data["passenger_id"],),
+            )
         conn.commit()
         return dict(booking)
     except Exception:
@@ -626,8 +630,17 @@ def get_user_reviews(user_id: int, limit: int = 20) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def update_booking_status(booking_id: int, status: str) -> Optional[dict]:
+def update_booking_status(booking_id: int, status: str, cancelled_by: str = "passenger", reason: str = "Cancelled by user") -> Optional[dict]:
     """Cancelling or rejecting a booking returns seats to the ride and refunds escrow."""
+    if status == "cancelled":
+        from cancellation import execute_cancellation
+        b = get_booking(booking_id)
+        if not b:
+            return None
+        pax_id = b.get("passenger_id") or 1
+        execute_cancellation(booking_id, pax_id, reason=reason, cancelled_by=cancelled_by)
+        return get_booking(booking_id)
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:

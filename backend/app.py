@@ -373,6 +373,11 @@ def get_user_trust_score_profile(user_id: int):
             "rating": user.get("rating", 0.0),
             "completed_deliveries": user.get("completed_deliveries", 0),
             "cancellation_count": user.get("cancellation_count", 0),
+            "total_bookings": user.get("total_bookings", 0),
+            "total_cancellations": user.get("total_cancellations", 0),
+            "late_cancellations": user.get("late_cancellations", 0),
+            "cancellation_rate": user.get("cancellation_rate", 0.0),
+            "is_cancellation_flagged": user.get("is_cancellation_flagged", False),
             "delivery_success_rate": success_rate,
             "route_deviation_count": user.get("route_deviation_count", 0),
             "report_count": user.get("report_count", 0),
@@ -849,6 +854,32 @@ async def send_chat_message(booking_id: int, req: dict):
         asyncio.create_task(manager.broadcast_to_user(booking["rider_id"], payload))
 
     return saved_msg
+
+
+@app.get("/bookings/{booking_id}/cancellation-preview")
+def get_booking_cancellation_preview(booking_id: int, user_id: Optional[int] = None):
+    try:
+        from cancellation import get_cancellation_preview
+        return get_cancellation_preview(booking_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/bookings/{booking_id}/cancel")
+def cancel_booking_endpoint(booking_id: int, payload: dict):
+    user_id = payload.get("user_id")
+    reason = payload.get("reason", "Change of plans")
+    cancelled_by = payload.get("cancelled_by", "passenger")
+
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required.")
+
+    try:
+        from cancellation import execute_cancellation
+        result = execute_cancellation(booking_id, int(user_id), reason=reason, cancelled_by=cancelled_by)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/bookings/{booking_id}/status")

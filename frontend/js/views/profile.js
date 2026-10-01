@@ -157,9 +157,15 @@ export default function profileView(container) {
         <div class="stack small" style="margin-top:var(--space-3)">
           <div class="row-tight" style="justify-content:space-between"><span class="muted">Rating</span><span>${Number(stats.rating || 0).toFixed(1)} / 5</span></div>
           <div class="row-tight" style="justify-content:space-between"><span class="muted">Completed trips</span><span>${stats.completed_deliveries ?? 0}</span></div>
-          <div class="row-tight" style="justify-content:space-between"><span class="muted">Cancellations</span><span>${stats.cancellation_count ?? 0}</span></div>
+          <div class="row-tight" style="justify-content:space-between"><span class="muted">Total Bookings</span><span>${stats.total_bookings ?? 0}</span></div>
+          <div class="row-tight" style="justify-content:space-between"><span class="muted">Cancellations</span><span>${stats.total_cancellations ?? stats.cancellation_count ?? 0} (${Math.round((stats.cancellation_rate || 0) * 100)}%)</span></div>
           <div class="row-tight" style="justify-content:space-between"><span class="muted">Reports filed</span><span>${stats.report_count ?? 0}</span></div>
         </div>
+        ${stats.is_cancellation_flagged || (stats.cancellation_rate > 0.25 && (stats.total_cancellations > 2)) ? `
+          <div style="margin-top:var(--space-3); padding:var(--space-2) var(--space-3); background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#dc2626; border-radius:var(--radius-md); font-size:12px;">
+            ⚠️ <strong>Frequent Cancellations Flagged:</strong> High cancellation rate may affect your trust score and future booking privileges.
+          </div>
+        ` : ''}
       `;
     } catch (error) {
       trustNode.textContent = error.message;

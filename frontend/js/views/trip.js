@@ -374,6 +374,13 @@ export default function tripView(container, query) {
 
     bodyNode.querySelectorAll('[data-status]').forEach((button) => {
       button.addEventListener('click', async () => {
+        if (button.dataset.status === 'cancelled') {
+          const { showCancellationModal } = await import('../components/cancellation-modal.js');
+          showCancellationModal(booking.id, async () => {
+            await refresh();
+          }, isRider() ? 'rider' : 'passenger');
+          return;
+        }
         setBusy(button, true, 'Saving…');
         try {
           await api.updateBookingStatus(booking.id, button.dataset.status);

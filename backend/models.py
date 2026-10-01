@@ -116,6 +116,32 @@ def create_tables():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT 'unspecified';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_bookings INTEGER DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_cancellations INTEGER DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS late_cancellations INTEGER DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS no_shows INTEGER DEFAULT 0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS cancellation_rate REAL DEFAULT 0.0;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_cancellation_flagged BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_fee REAL DEFAULT 0.0;",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS refund_amount REAL DEFAULT 0.0;",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by TEXT DEFAULT 'passenger';",
+            """CREATE TABLE IF NOT EXISTS cancellation_history (
+                id SERIAL PRIMARY KEY,
+                booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                ride_id INTEGER REFERENCES rides(id) ON DELETE CASCADE,
+                booking_amount REAL DEFAULT 0.0,
+                cancellation_fee REAL DEFAULT 0.0,
+                refund_amount REAL DEFAULT 0.0,
+                cancelled_at TIMESTAMPTZ DEFAULT NOW(),
+                reason TEXT,
+                cancelled_by TEXT DEFAULT 'passenger',
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );""",
+            "CREATE INDEX IF NOT EXISTS idx_canc_hist_booking ON cancellation_history(booking_id);",
+            "CREATE INDEX IF NOT EXISTS idx_canc_hist_user ON cancellation_history(user_id);",
         ]
         for migration in migrations:
             try:

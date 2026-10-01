@@ -114,6 +114,10 @@ export const api = {
   sendChatMessage: (id, payload) => request(`/bookings/${id}/chat`, { method: 'POST', body: payload }),
   updateBookingStatus: (id, status) =>
     request(`/bookings/${id}/status`, { method: 'POST', body: { status } }),
+  cancellationPreview: (id, userId) =>
+    request(`/bookings/${id}/cancellation-preview${userId ? `?user_id=${userId}` : ''}`),
+  cancelBooking: (id, userId, reason = 'Change of plans', cancelledBy = 'passenger') =>
+    request(`/bookings/${id}/cancel`, { method: 'POST', body: { user_id: userId, reason, cancelled_by: cancelledBy } }),
   startBooking: (id, otp) => request(`/bookings/${id}/start`, { method: 'POST', body: { otp } }),
   completeBooking: (id) => request(`/bookings/${id}/complete`, { method: 'POST', body: {} }),
   payBooking: (id) => request(`/bookings/${id}/pay`, { method: 'POST', body: {} }),

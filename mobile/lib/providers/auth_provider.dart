@@ -43,24 +43,35 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
+    print('[AUTH PROVIDER] LOGIN STARTED for $email');
 
     try {
       final res = await _apiService.login(email, password);
-      _token = res['access_token'];
-      _user = UserModel.fromJson(res['user']);
+      print('[AUTH PROVIDER] LOGIN RESPONSE RECEIVED: $res');
+
+      _token = res['access_token'] ?? res['token'];
+
+      final Map<String, dynamic> userData = (res['user'] != null && res['user'] is Map)
+          ? Map<String, dynamic>.from(res['user'])
+          : Map<String, dynamic>.from(res);
+
+      _user = UserModel.fromJson(userData);
 
       _apiService.setAuthToken(_token);
       await _storage.write(key: 'jwt_token', value: _token);
       await _storage.write(key: 'user_data', value: jsonEncode(_user!.toJson()));
 
-      _isLoading = false;
-      notifyListeners();
+      print('[AUTH PROVIDER] LOGIN SUCCESSFUL FOR USER ${_user?.name} (ID: ${_user?.id})');
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      print('[AUTH PROVIDER] LOGIN ERROR: $e');
+      print(stack);
       _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return false;
+      print('[AUTH PROVIDER] LOGIN FINALLY: isLoading reset to false');
     }
   }
 
@@ -68,24 +79,35 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
+    print('[AUTH PROVIDER] REGISTER STARTED for ${payload["email"]}');
 
     try {
       final res = await _apiService.register(payload);
-      _token = res['access_token'];
-      _user = UserModel.fromJson(res['user']);
+      print('[AUTH PROVIDER] REGISTER RESPONSE RECEIVED: $res');
+
+      _token = res['access_token'] ?? res['token'];
+
+      final Map<String, dynamic> userData = (res['user'] != null && res['user'] is Map)
+          ? Map<String, dynamic>.from(res['user'])
+          : Map<String, dynamic>.from(res);
+
+      _user = UserModel.fromJson(userData);
 
       _apiService.setAuthToken(_token);
       await _storage.write(key: 'jwt_token', value: _token);
       await _storage.write(key: 'user_data', value: jsonEncode(_user!.toJson()));
 
-      _isLoading = false;
-      notifyListeners();
+      print('[AUTH PROVIDER] REGISTER SUCCESSFUL FOR USER ${_user?.name} (ID: ${_user?.id})');
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      print('[AUTH PROVIDER] REGISTER ERROR: $e');
+      print(stack);
       _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return false;
+      print('[AUTH PROVIDER] REGISTER FINALLY: isLoading reset to false');
     }
   }
 

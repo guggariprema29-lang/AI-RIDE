@@ -1,0 +1,200 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.airide.mobility"
+4    android:versionCode="1"
+5    android:versionName="1.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+9        android:targetSdkVersion="34" />
+10
+11    <!-- Permissions required for AI Ride Mobile App -->
+12    <uses-permission android:name="android.permission.INTERNET" />
+12-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:5:5-66
+12-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:5:22-64
+13    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+13-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:6:5-78
+13-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:6:22-76
+14    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+14-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:7:5-80
+14-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:7:22-78
+15    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+15-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:8:5-84
+15-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:8:22-82
+16    <uses-permission android:name="android.permission.CAMERA" />
+16-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:9:5-64
+16-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:9:22-62
+17    <uses-permission android:name="android.permission.CALL_PHONE" />
+17-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:10:5-68
+17-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:10:22-66
+18    <uses-permission android:name="android.permission.VIBRATE" />
+18-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:11:5-65
+18-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:11:22-63
+19
+20    <permission
+20-->[androidx.core:core:1.13.1] C:\Users\Prema\.gradle\caches\8.10\transforms\fc92284cbf9ed37375918e18e1006208\transformed\core-1.13.1\AndroidManifest.xml:22:5-24:47
+21        android:name="com.airide.mobility.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+21-->[androidx.core:core:1.13.1] C:\Users\Prema\.gradle\caches\8.10\transforms\fc92284cbf9ed37375918e18e1006208\transformed\core-1.13.1\AndroidManifest.xml:23:9-81
+22        android:protectionLevel="signature" />
+22-->[androidx.core:core:1.13.1] C:\Users\Prema\.gradle\caches\8.10\transforms\fc92284cbf9ed37375918e18e1006208\transformed\core-1.13.1\AndroidManifest.xml:24:9-44
+23
+24    <uses-permission android:name="com.airide.mobility.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+24-->[androidx.core:core:1.13.1] C:\Users\Prema\.gradle\caches\8.10\transforms\fc92284cbf9ed37375918e18e1006208\transformed\core-1.13.1\AndroidManifest.xml:26:5-97
+24-->[androidx.core:core:1.13.1] C:\Users\Prema\.gradle\caches\8.10\transforms\fc92284cbf9ed37375918e18e1006208\transformed\core-1.13.1\AndroidManifest.xml:26:22-94
+25
+26    <application
+27        android:name="android.app.Application"
+27-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:15:9-42
+28        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+28-->[androidx.core:core:1.13.1] C:\Users\Prema\.gradle\caches\8.10\transforms\fc92284cbf9ed37375918e18e1006208\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
+29        android:extractNativeLibs="true"
+30        android:icon="@android:drawable/sym_def_app_icon"
+30-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:16:9-58
+31        android:label="AI RIDE"
+31-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:14:9-32
+32        android:usesCleartextTraffic="true" >
+32-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:17:9-44
+33        <activity
+33-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:19:9-37:20
+34            android:name="com.airide.mobility.MainActivity"
+34-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:20:13-41
+35            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+35-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:24:13-163
+36            android:exported="true"
+36-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:21:13-36
+37            android:hardwareAccelerated="true"
+37-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:25:13-47
+38            android:launchMode="singleTop"
+38-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:22:13-43
+39            android:theme="@style/LaunchTheme"
+39-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:23:13-47
+40            android:windowSoftInputMode="adjustResize" >
+40-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:26:13-55
+41            <meta-data
+41-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:28:13-31:17
+42                android:name="io.flutter.embedding.android.NormalTheme"
+42-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:29:15-70
+43                android:resource="@style/NormalTheme" />
+43-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:30:15-52
+44
+45            <intent-filter>
+45-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:33:13-36:29
+46                <action android:name="android.intent.action.MAIN" />
+46-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:34:17-68
+46-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:34:25-66
+47
+48                <category android:name="android.intent.category.LAUNCHER" />
+48-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:35:17-76
+48-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:35:27-74
+49            </intent-filter>
+50        </activity>
+51
+52        <meta-data
+52-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:39:9-41:33
+53            android:name="flutterEmbedding"
+53-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:40:13-44
+54            android:value="2" />
+54-->C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\android\app\src\main\AndroidManifest.xml:41:13-30
+55
+56        <service
+56-->[:geolocator_android] C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\build\geolocator_android\intermediates\merged_manifest\release\AndroidManifest.xml:8:9-12:56
+57            android:name="com.baseflow.geolocator.GeolocatorLocationService"
+57-->[:geolocator_android] C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\build\geolocator_android\intermediates\merged_manifest\release\AndroidManifest.xml:9:13-77
+58            android:enabled="true"
+58-->[:geolocator_android] C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\build\geolocator_android\intermediates\merged_manifest\release\AndroidManifest.xml:10:13-35
+59            android:exported="false"
+59-->[:geolocator_android] C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\build\geolocator_android\intermediates\merged_manifest\release\AndroidManifest.xml:11:13-37
+60            android:foregroundServiceType="location" />
+60-->[:geolocator_android] C:\Users\Prema\OneDrive\Desktop\AI-RIDE\AI-RIDE\mobile\build\geolocator_android\intermediates\merged_manifest\release\AndroidManifest.xml:12:13-53
+61
+62        <uses-library
+62-->[androidx.window:window:1.2.0] C:\Users\Prema\.gradle\caches\8.10\transforms\46026298a76071db41b67f0f0d962628\transformed\jetified-window-1.2.0\AndroidManifest.xml:23:9-25:40
+63            android:name="androidx.window.extensions"
+63-->[androidx.window:window:1.2.0] C:\Users\Prema\.gradle\caches\8.10\transforms\46026298a76071db41b67f0f0d962628\transformed\jetified-window-1.2.0\AndroidManifest.xml:24:13-54
+64            android:required="false" />
+64-->[androidx.window:window:1.2.0] C:\Users\Prema\.gradle\caches\8.10\transforms\46026298a76071db41b67f0f0d962628\transformed\jetified-window-1.2.0\AndroidManifest.xml:25:13-37
+65        <uses-library
+65-->[androidx.window:window:1.2.0] C:\Users\Prema\.gradle\caches\8.10\transforms\46026298a76071db41b67f0f0d962628\transformed\jetified-window-1.2.0\AndroidManifest.xml:26:9-28:40
+66            android:name="androidx.window.sidecar"
+66-->[androidx.window:window:1.2.0] C:\Users\Prema\.gradle\caches\8.10\transforms\46026298a76071db41b67f0f0d962628\transformed\jetified-window-1.2.0\AndroidManifest.xml:27:13-51
+67            android:required="false" />
+67-->[androidx.window:window:1.2.0] C:\Users\Prema\.gradle\caches\8.10\transforms\46026298a76071db41b67f0f0d962628\transformed\jetified-window-1.2.0\AndroidManifest.xml:28:13-37
+68
+69        <activity
+69-->[com.google.android.gms:play-services-base:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\ef09ab2bcbb921c5f45026e4403fa3f6\transformed\jetified-play-services-base-18.3.0\AndroidManifest.xml:20:9-22:45
+70            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+70-->[com.google.android.gms:play-services-base:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\ef09ab2bcbb921c5f45026e4403fa3f6\transformed\jetified-play-services-base-18.3.0\AndroidManifest.xml:20:19-85
+71            android:exported="false"
+71-->[com.google.android.gms:play-services-base:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\ef09ab2bcbb921c5f45026e4403fa3f6\transformed\jetified-play-services-base-18.3.0\AndroidManifest.xml:22:19-43
+72            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+72-->[com.google.android.gms:play-services-base:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\ef09ab2bcbb921c5f45026e4403fa3f6\transformed\jetified-play-services-base-18.3.0\AndroidManifest.xml:21:19-78
+73
+74        <meta-data
+74-->[com.google.android.gms:play-services-basement:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\2eb41a7c1d4863ce65f980e3329349b3\transformed\jetified-play-services-basement-18.3.0\AndroidManifest.xml:21:9-23:69
+75            android:name="com.google.android.gms.version"
+75-->[com.google.android.gms:play-services-basement:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\2eb41a7c1d4863ce65f980e3329349b3\transformed\jetified-play-services-basement-18.3.0\AndroidManifest.xml:22:13-58
+76            android:value="@integer/google_play_services_version" />
+76-->[com.google.android.gms:play-services-basement:18.3.0] C:\Users\Prema\.gradle\caches\8.10\transforms\2eb41a7c1d4863ce65f980e3329349b3\transformed\jetified-play-services-basement-18.3.0\AndroidManifest.xml:23:13-66
+77
+78        <provider
+78-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:24:9-32:20
+79            android:name="androidx.startup.InitializationProvider"
+79-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:25:13-67
+80            android:authorities="com.airide.mobility.androidx-startup"
+80-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:26:13-68
+81            android:exported="false" >
+81-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:27:13-37
+82            <meta-data
+82-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
+83                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+83-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
+84                android:value="androidx.startup" />
+84-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\Prema\.gradle\caches\8.10\transforms\c50eb5076b7de142aca753545b272d21\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
+85            <meta-data
+85-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:29:13-31:52
+86                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+86-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:30:17-85
+87                android:value="androidx.startup" />
+87-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:31:17-49
+88        </provider>
+89
+90        <receiver
+90-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:34:9-52:20
+91            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+91-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:35:13-76
+92            android:directBootAware="false"
+92-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:36:13-44
+93            android:enabled="true"
+93-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:37:13-35
+94            android:exported="true"
+94-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:38:13-36
+95            android:permission="android.permission.DUMP" >
+95-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:39:13-57
+96            <intent-filter>
+96-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:40:13-42:29
+97                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+97-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:41:17-91
+97-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:41:25-88
+98            </intent-filter>
+99            <intent-filter>
+99-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:43:13-45:29
+100                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+100-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:44:17-85
+100-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:44:25-82
+101            </intent-filter>
+102            <intent-filter>
+102-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:46:13-48:29
+103                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+103-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:47:17-88
+103-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:47:25-85
+104            </intent-filter>
+105            <intent-filter>
+105-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:49:13-51:29
+106                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+106-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:50:17-95
+106-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Prema\.gradle\caches\8.10\transforms\87bb14f25689bc30ab6cca2f13ba7ebc\transformed\jetified-profileinstaller-1.3.1\AndroidManifest.xml:50:25-92
+107            </intent-filter>
+108        </receiver>
+109    </application>
+110
+111</manifest>

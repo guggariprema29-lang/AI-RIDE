@@ -94,4 +94,6 @@ class RideModel {
       estimatedFare: json['fare'] != null ? (json['fare']).toDouble() : null,
     );
   }
+
+  double get totalDistanceM => detourMeters ?? 5000.0;
 }

@@ -210,7 +210,9 @@ def register_user_info():
 
 
 @app.post("/users/register")
+@app.post("/auth/register")
 def register_user(user: UserCreate):
+    print(f"[AUTH LOG] REGISTER REQUEST RECEIVED - Email: {user.email}, Phone: {user.phone}, Name: {user.name}")
     try:
         trust_score = calculate_trust_score(
             face_verified=user.face_verified,
@@ -226,20 +228,30 @@ def register_user(user: UserCreate):
         user_data["trust_score"] = trust_score
         if user.password:
             user_data["password_hash"] = hash_password(user.password)
+            
+        print("[AUTH LOG] DATABASE CONNECTION OK - Creating User...")
         new_user = create_user(user_data)
         # Every account gets a stable, shareable ID such as AR-000042.
         new_user["public_id"] = ensure_public_id(new_user["id"])
         token = create_access_token({"sub": str(new_user["id"]), "email": new_user.get("email"), "id": new_user["id"]})
+        
         # Return safe dict — never expose password_hash
         safe = {k: (str(v) if hasattr(v, 'isoformat') else v)
                 for k, v in new_user.items() if k != "password_hash"}
         safe["token"] = token
         safe["access_token"] = token
+        safe["user"] = safe.copy()  # Both top-level and "user" subkey available
+        
+        print(f"[AUTH LOG] REGISTER SUCCESS - User ID: {new_user['id']}, Public ID: {new_user['public_id']}")
         return JSONResponse(content=jsonable_encoder(safe))
-    except psycopg2.errors.UniqueViolation as e:
-        raise HTTPException(status_code=400, detail="An account with this email or Government ID already exists.")
-    except psycopg2.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as e:
+        err_str = str(e)
+        if "unique" in err_str.lower() or "duplicate" in err_str.lower() or "already exists" in err_str.lower() or isinstance(e, psycopg2.errors.UniqueViolation):
+            print(f"[AUTH LOG] REGISTER FAILED - Account already exists: {err_str}")
+            raise HTTPException(status_code=400, detail="An account with this email or phone number already exists.")
+        print(f"[AUTH LOG] REGISTER ERROR: {err_str}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Registration error: {err_str}")
 
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────
@@ -308,21 +320,56 @@ def verify_otp(req: OTPVerify):
 
 @app.post("/auth/login")
 def login(req: LoginRequest):
-    from models import get_user_by_email
-    user = get_user_by_email(req.email)
-    if not user:
-        raise HTTPException(status_code=401, detail="No account found with this email.")
-    stored_hash = user.get("password_hash")
-    if not stored_hash or not verify_password(req.password, stored_hash):
-        raise HTTPException(status_code=401, detail="Incorrect password.")
-    # Return user without password hash
-    user.pop("password_hash", None)
-    user["public_id"] = ensure_public_id(user["id"])
-    token = create_access_token({"sub": str(user["id"]), "email": user.get("email"), "id": user["id"]})
-    safe = {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()}
-    safe["token"] = token
-    safe["access_token"] = token
-    return jsonable_encoder(safe)
+    print(f"[AUTH LOG] LOGIN REQUEST RECEIVED for identifier: {req.email}")
+    try:
+        from models import get_user_by_email, get_connection
+        user = get_user_by_email(req.email)
+        
+        # If not found by email, try phone lookup
+        if not user:
+            clean_phone = re.sub(r"\D", "", req.email.strip())
+            if len(clean_phone) >= 8:
+                try:
+                    conn = get_connection()
+                    print("[AUTH LOG] DATABASE CONNECTION OK for phone lookup")
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT * FROM users WHERE phone = %s OR phone = %s OR phone = %s", 
+                                    (req.email.strip(), clean_phone, f"+91{clean_phone}"))
+                        row = cur.fetchone()
+                        if row:
+                            colnames = [desc[0] for desc in cur.description]
+                            user = dict(zip(colnames, row))
+                    conn.close()
+                except Exception as ex:
+                    print(f"[AUTH LOG] Phone lookup error: {ex}")
+
+        if not user:
+            print(f"[AUTH LOG] LOGIN FAILED - User not found for identifier: {req.email}")
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+        print(f"[AUTH LOG] USER FOUND - ID: {user.get('id')}, Name: {user.get('name')}")
+        stored_hash = user.get("password_hash")
+        if not stored_hash or not verify_password(req.password, stored_hash):
+            print(f"[AUTH LOG] LOGIN FAILED - Incorrect password for user ID: {user.get('id')}")
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+            
+        print(f"[AUTH LOG] PASSWORD VERIFIED for user ID: {user.get('id')}")
+        user.pop("password_hash", None)
+        user["public_id"] = ensure_public_id(user["id"])
+        token = create_access_token({"sub": str(user["id"]), "email": user.get("email"), "id": user["id"]})
+        safe = {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in user.items()}
+        safe["token"] = token
+        safe["access_token"] = token
+        safe["user"] = safe.copy()  # Both top-level and "user" subkey available
+        
+        print(f"[AUTH LOG] LOGIN SUCCESSFUL - Returning token for user ID: {user['id']}")
+        return JSONResponse(content=jsonable_encoder(safe))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[AUTH LOG] LOGIN ERROR: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
 
 
 @app.get("/users/{user_id}")

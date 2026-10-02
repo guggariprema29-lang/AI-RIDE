@@ -24,8 +24,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.airide.mobility"
-    compileSdkVersion 34
-    ndkVersion flutter.ndkVersion
+    compileSdk = 34
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -38,8 +37,8 @@ android {
 
     defaultConfig {
         applicationId "com.airide.mobility"
-        minSdkVersion 21
-        targetSdkVersion 34
+        minSdk = 21
+        targetSdk = 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

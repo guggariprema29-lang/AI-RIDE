@@ -20,56 +20,88 @@ class ApiService {
         if (_authToken != null) 'Authorization': 'Bearer $_authToken',
       };
 
+  // ── Server Warmup ─────────────────────────────────────────────────────────
+
+  Future<void> warmUpBackend() async {
+    try {
+      print('[AUTH API] WARMING UP BACKEND SERVER AT ${ApiConstants.baseUrl}...');
+      await http.get(Uri.parse('${ApiConstants.baseUrl}/')).timeout(const Duration(seconds: 45));
+      print('[AUTH API] BACKEND SERVER IS AWAKE AND READY');
+    } catch (e) {
+      print('[AUTH API] WARMUP NOTICE: $e');
+    }
+  }
+
   // ── Authentication ─────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final url = '${ApiConstants.baseUrl}${ApiConstants.login}';
     print('[AUTH API] AUTH REQUEST STARTED -> POST $url');
-    try {
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: _headers,
-            body: jsonEncode({'email': email, 'password': password}),
-          )
-          .timeout(const Duration(seconds: 15));
-      print('[AUTH API] RESPONSE RECEIVED (${response.statusCode}): ${response.body}');
-      return _handleResponse(response);
-    } on TimeoutException {
-      print('[AUTH API] REQUEST TIMEOUT (15s)');
-      throw Exception('Unable to connect to server. Please check your internet connection and try again.');
-    } on SocketException catch (e) {
-      print('[AUTH API] SOCKET EXCEPTION: $e');
-      throw Exception('Unable to connect to server. Please check your internet connection and try again.');
-    } catch (e) {
-      print('[AUTH API] REQUEST ERROR: $e');
-      rethrow;
+
+    for (int attempt = 1; attempt <= 2; attempt++) {
+      try {
+        print('[AUTH API] LOGIN ATTEMPT $attempt/2...');
+        final response = await http
+            .post(
+              Uri.parse(url),
+              headers: _headers,
+              body: jsonEncode({'email': email, 'password': password}),
+            )
+            .timeout(const Duration(seconds: 45));
+        print('[AUTH API] RESPONSE RECEIVED (${response.statusCode}): ${response.body}');
+        return _handleResponse(response);
+      } on TimeoutException catch (e) {
+        print('[AUTH API] LOGIN TIMEOUT (45s) on attempt $attempt: $e');
+        if (attempt == 2) {
+          throw Exception('Server startup is taking longer than expected. Please wait a moment and try again.');
+        }
+      } on SocketException catch (e) {
+        print('[AUTH API] LOGIN SOCKET EXCEPTION on attempt $attempt: $e');
+        if (attempt == 2) {
+          throw Exception('Unable to connect to server. Please check your internet connection and try again.');
+        }
+      } catch (e) {
+        print('[AUTH API] LOGIN ERROR: $e');
+        rethrow;
+      }
+      await Future.delayed(const Duration(seconds: 1));
     }
+    throw Exception('Unable to connect to server. Please try again.');
   }
 
   Future<Map<String, dynamic>> register(Map<String, dynamic> payload) async {
     final url = '${ApiConstants.baseUrl}${ApiConstants.register}';
     print('[AUTH API] AUTH REGISTER STARTED -> POST $url');
-    try {
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: _headers,
-            body: jsonEncode(payload),
-          )
-          .timeout(const Duration(seconds: 15));
-      print('[AUTH API] REGISTER RESPONSE RECEIVED (${response.statusCode}): ${response.body}');
-      return _handleResponse(response);
-    } on TimeoutException {
-      print('[AUTH API] REGISTER TIMEOUT (15s)');
-      throw Exception('Unable to connect to server. Please check your internet connection and try again.');
-    } on SocketException catch (e) {
-      print('[AUTH API] REGISTER SOCKET EXCEPTION: $e');
-      throw Exception('Unable to connect to server. Please check your internet connection and try again.');
-    } catch (e) {
-      print('[AUTH API] REGISTER ERROR: $e');
-      rethrow;
+
+    for (int attempt = 1; attempt <= 2; attempt++) {
+      try {
+        print('[AUTH API] REGISTER ATTEMPT $attempt/2...');
+        final response = await http
+            .post(
+              Uri.parse(url),
+              headers: _headers,
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 45));
+        print('[AUTH API] REGISTER RESPONSE RECEIVED (${response.statusCode}): ${response.body}');
+        return _handleResponse(response);
+      } on TimeoutException catch (e) {
+        print('[AUTH API] REGISTER TIMEOUT (45s) on attempt $attempt: $e');
+        if (attempt == 2) {
+          throw Exception('Server startup is taking longer than expected. Please wait a moment and try again.');
+        }
+      } on SocketException catch (e) {
+        print('[AUTH API] REGISTER SOCKET EXCEPTION on attempt $attempt: $e');
+        if (attempt == 2) {
+          throw Exception('Unable to connect to server. Please check your internet connection and try again.');
+        }
+      } catch (e) {
+        print('[AUTH API] REGISTER ERROR: $e');
+        rethrow;
+      }
+      await Future.delayed(const Duration(seconds: 1));
     }
+    throw Exception('Unable to connect to server. Please try again.');
   }
 
   // ── User & Trust Score ──────────────────────────────────────────────────────

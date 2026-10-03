@@ -30,10 +30,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkAuthAndNavigate() async {
+    // Warm up backend in background as soon as app opens
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    authProvider.apiService.warmUpBackend();
+
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.tryAutoLogin();
 
     if (!mounted) return;

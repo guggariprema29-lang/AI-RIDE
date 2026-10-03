@@ -32,7 +32,7 @@ def _needs_ssl(url: str) -> bool:
 def get_connection():
     if DATABASE_URL:
         # psycopg2 understands postgres:// as well as postgresql://
-        kwargs = {}
+        kwargs = {"connect_timeout": 10}
         sslmode = os.getenv("PGSSLMODE")
         if sslmode:
             kwargs["sslmode"] = sslmode

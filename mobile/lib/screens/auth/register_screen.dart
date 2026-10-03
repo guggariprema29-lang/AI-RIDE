@@ -21,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emergencyPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _agreedToTerms = true;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -40,6 +41,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
+    if (_isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final payload = {
@@ -55,22 +61,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'face_verified': true, // Demo verification
     };
 
-    final success = await authProvider.register(payload);
+    try {
+      final success = await authProvider.register(payload);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (success) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
-        (route) => false,
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Registration failed.'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      if (success) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeDashboardScreen()),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ?? 'Registration failed.'),
+            backgroundColor: AppColors.danger,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppColors.danger,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -163,10 +188,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 20),
 
                 ElevatedButton(
-                  onPressed: authProvider.isLoading ? null : _handleRegister,
-                  child: authProvider.isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('Register & Verify Profile'),
+                  onPressed: (_isSubmitting || authProvider.isLoading) ? null : _handleRegister,
+                  child: (_isSubmitting || authProvider.isLoading)
+                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                      : const Text('Register & Verify Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 24),
               ],

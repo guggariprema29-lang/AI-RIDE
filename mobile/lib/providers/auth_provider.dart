@@ -6,7 +6,9 @@ import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
   UserModel? _user;
   String? _token;
@@ -32,7 +34,7 @@ class AuthProvider with ChangeNotifier {
         _user = UserModel.fromJson(jsonDecode(storedUserData));
       }
     } catch (e) {
-      _error = e.toString();
+      print('[AUTH PROVIDER] Auto-login storage read notice: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -56,10 +58,14 @@ class AuthProvider with ChangeNotifier {
           : Map<String, dynamic>.from(res);
 
       _user = UserModel.fromJson(userData);
-
       _apiService.setAuthToken(_token);
-      await _storage.write(key: 'jwt_token', value: _token);
-      await _storage.write(key: 'user_data', value: jsonEncode(_user!.toJson()));
+
+      try {
+        if (_token != null) await _storage.write(key: 'jwt_token', value: _token);
+        if (_user != null) await _storage.write(key: 'user_data', value: jsonEncode(_user!.toJson()));
+      } catch (stErr) {
+        print('[AUTH PROVIDER] Storage write notice: $stErr');
+      }
 
       print('[AUTH PROVIDER] LOGIN SUCCESSFUL FOR USER ${_user?.name} (ID: ${_user?.id})');
       return true;
@@ -92,10 +98,14 @@ class AuthProvider with ChangeNotifier {
           : Map<String, dynamic>.from(res);
 
       _user = UserModel.fromJson(userData);
-
       _apiService.setAuthToken(_token);
-      await _storage.write(key: 'jwt_token', value: _token);
-      await _storage.write(key: 'user_data', value: jsonEncode(_user!.toJson()));
+
+      try {
+        if (_token != null) await _storage.write(key: 'jwt_token', value: _token);
+        if (_user != null) await _storage.write(key: 'user_data', value: jsonEncode(_user!.toJson()));
+      } catch (stErr) {
+        print('[AUTH PROVIDER] Storage write notice: $stErr');
+      }
 
       print('[AUTH PROVIDER] REGISTER SUCCESSFUL FOR USER ${_user?.name} (ID: ${_user?.id})');
       return true;
@@ -115,7 +125,9 @@ class AuthProvider with ChangeNotifier {
     _token = null;
     _user = null;
     _apiService.setAuthToken(null);
-    await _storage.deleteAll();
+    try {
+      await _storage.deleteAll();
+    } catch (_) {}
     notifyListeners();
   }
 }

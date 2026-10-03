@@ -36,72 +36,64 @@ class ApiService {
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final url = '${ApiConstants.baseUrl}${ApiConstants.login}';
-    print('[AUTH API] AUTH REQUEST STARTED -> POST $url');
+    print('[AUTH API] --------------------------------------------------');
+    print('[AUTH API] AUTH REQUEST START -> POST $url');
+    print('[AUTH API] REQUEST SENT');
 
-    for (int attempt = 1; attempt <= 2; attempt++) {
-      try {
-        print('[AUTH API] LOGIN ATTEMPT $attempt/2...');
-        final response = await http
-            .post(
-              Uri.parse(url),
-              headers: _headers,
-              body: jsonEncode({'email': email, 'password': password}),
-            )
-            .timeout(const Duration(seconds: 45));
-        print('[AUTH API] RESPONSE RECEIVED (${response.statusCode}): ${response.body}');
-        return _handleResponse(response);
-      } on TimeoutException catch (e) {
-        print('[AUTH API] LOGIN TIMEOUT (45s) on attempt $attempt: $e');
-        if (attempt == 2) {
-          throw Exception('Server startup is taking longer than expected. Please wait a moment and try again.');
-        }
-      } on SocketException catch (e) {
-        print('[AUTH API] LOGIN SOCKET EXCEPTION on attempt $attempt: $e');
-        if (attempt == 2) {
-          throw Exception('Unable to connect to server. Please check your internet connection and try again.');
-        }
-      } catch (e) {
-        print('[AUTH API] LOGIN ERROR: $e');
-        rethrow;
-      }
-      await Future.delayed(const Duration(seconds: 1));
+    try {
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: _headers,
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      print('[AUTH API] RESPONSE RECEIVED (${response.statusCode})');
+      print('[AUTH API] RESPONSE BODY: ${response.body}');
+      print('[AUTH API] AUTH REQUEST END');
+      return _handleResponse(response);
+    } on TimeoutException catch (e) {
+      print('[AUTH API] LOGIN TIMEOUT (25s): $e');
+      throw Exception('Server is taking too long to respond. Please try again.');
+    } on SocketException catch (e) {
+      print('[AUTH API] LOGIN SOCKET EXCEPTION: $e');
+      throw Exception('Unable to reach server. Please check your network connection.');
+    } catch (e) {
+      print('[AUTH API] LOGIN ERROR: $e');
+      rethrow;
     }
-    throw Exception('Unable to connect to server. Please try again.');
   }
 
   Future<Map<String, dynamic>> register(Map<String, dynamic> payload) async {
     final url = '${ApiConstants.baseUrl}${ApiConstants.register}';
-    print('[AUTH API] AUTH REGISTER STARTED -> POST $url');
+    print('[AUTH API] --------------------------------------------------');
+    print('[AUTH API] AUTH REGISTER START -> POST $url');
+    print('[AUTH API] REQUEST SENT');
 
-    for (int attempt = 1; attempt <= 2; attempt++) {
-      try {
-        print('[AUTH API] REGISTER ATTEMPT $attempt/2...');
-        final response = await http
-            .post(
-              Uri.parse(url),
-              headers: _headers,
-              body: jsonEncode(payload),
-            )
-            .timeout(const Duration(seconds: 45));
-        print('[AUTH API] REGISTER RESPONSE RECEIVED (${response.statusCode}): ${response.body}');
-        return _handleResponse(response);
-      } on TimeoutException catch (e) {
-        print('[AUTH API] REGISTER TIMEOUT (45s) on attempt $attempt: $e');
-        if (attempt == 2) {
-          throw Exception('Server startup is taking longer than expected. Please wait a moment and try again.');
-        }
-      } on SocketException catch (e) {
-        print('[AUTH API] REGISTER SOCKET EXCEPTION on attempt $attempt: $e');
-        if (attempt == 2) {
-          throw Exception('Unable to connect to server. Please check your internet connection and try again.');
-        }
-      } catch (e) {
-        print('[AUTH API] REGISTER ERROR: $e');
-        rethrow;
-      }
-      await Future.delayed(const Duration(seconds: 1));
+    try {
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: _headers,
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      print('[AUTH API] REGISTER RESPONSE RECEIVED (${response.statusCode})');
+      print('[AUTH API] REGISTER RESPONSE BODY: ${response.body}');
+      print('[AUTH API] AUTH REGISTER END');
+      return _handleResponse(response);
+    } on TimeoutException catch (e) {
+      print('[AUTH API] REGISTER TIMEOUT (25s): $e');
+      throw Exception('Server is taking too long to respond. Please try again.');
+    } on SocketException catch (e) {
+      print('[AUTH API] REGISTER SOCKET EXCEPTION: $e');
+      throw Exception('Unable to reach server. Please check your network connection.');
+    } catch (e) {
+      print('[AUTH API] REGISTER ERROR: $e');
+      rethrow;
     }
-    throw Exception('Unable to connect to server. Please try again.');
   }
 
   // ── User & Trust Score ──────────────────────────────────────────────────────
@@ -337,7 +329,26 @@ class ApiService {
       try {
         err = jsonDecode(response.body);
       } catch (_) {}
-      throw Exception(err['detail'] ?? err['message'] ?? 'API Request failed (${response.statusCode})');
+
+      final detail = err['detail'] ?? err['message'];
+      if (detail != null && detail.toString().trim().isNotEmpty) {
+        throw Exception(detail.toString().trim());
+      }
+
+      switch (response.statusCode) {
+        case 400:
+          throw Exception('Invalid request parameters. Please verify your entries.');
+        case 401:
+          throw Exception('Incorrect email/phone or password. Please try again.');
+        case 409:
+          throw Exception('An account with this email or phone number already exists.');
+        case 422:
+          throw Exception('Invalid input format. Please check the entered data.');
+        case 500:
+          throw Exception('Server error. Please try again in a few moments.');
+        default:
+          throw Exception('Server request failed with code ${response.statusCode}.');
+      }
     }
   }
 }

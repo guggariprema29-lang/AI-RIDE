@@ -163,7 +163,12 @@ def startup_event():
 
 @app.get("/", response_model=dict)
 def home():
-    return {"message": "AI Ride Sharing backend is running"}
+    return {"message": "AI Ride Sharing backend is running", "status": "ok"}
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 
 @app.websocket("/ws/{user_id}")
@@ -214,6 +219,24 @@ def register_user_info():
 def register_user(user: UserCreate):
     print(f"[AUTH LOG] REGISTER REQUEST RECEIVED - Email: {user.email}, Phone: {user.phone}, Name: {user.name}")
     try:
+        # Step 1: Pre-check duplicate email/phone
+        from models import get_user_by_email, get_connection
+        if user.email and get_user_by_email(user.email):
+            print(f"[AUTH LOG] REGISTER CONFLICT - Email {user.email} already exists")
+            raise HTTPException(status_code=409, detail="An account with this email address already exists. Please sign in.")
+            
+        clean_phone = re.sub(r"\D", "", user.phone.strip()) if user.phone else ""
+        if clean_phone:
+            conn = get_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM users WHERE phone = %s OR phone = %s OR phone = %s",
+                            (user.phone.strip(), clean_phone, f"+91{clean_phone}"))
+                if cur.fetchone():
+                    conn.close()
+                    print(f"[AUTH LOG] REGISTER CONFLICT - Phone {user.phone} already exists")
+                    raise HTTPException(status_code=409, detail="An account with this phone number already exists. Please sign in.")
+            conn.close()
+
         trust_score = calculate_trust_score(
             face_verified=user.face_verified,
             rating=user.rating,
@@ -244,11 +267,13 @@ def register_user(user: UserCreate):
         
         print(f"[AUTH LOG] REGISTER SUCCESS - User ID: {new_user['id']}, Public ID: {new_user['public_id']}")
         return JSONResponse(content=jsonable_encoder(safe))
+    except HTTPException:
+        raise
     except Exception as e:
         err_str = str(e)
         if "unique" in err_str.lower() or "duplicate" in err_str.lower() or "already exists" in err_str.lower() or isinstance(e, psycopg2.errors.UniqueViolation):
             print(f"[AUTH LOG] REGISTER FAILED - Account already exists: {err_str}")
-            raise HTTPException(status_code=400, detail="An account with this email or phone number already exists.")
+            raise HTTPException(status_code=409, detail="An account with this email or phone number already exists.")
         print(f"[AUTH LOG] REGISTER ERROR: {err_str}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Registration error: {err_str}")

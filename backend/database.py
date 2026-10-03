@@ -31,14 +31,24 @@ def _needs_ssl(url: str) -> bool:
 
 def get_connection():
     if DATABASE_URL:
-        # psycopg2 understands postgres:// as well as postgresql://
+        db_url = DATABASE_URL
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+
         kwargs = {"connect_timeout": 10}
-        sslmode = os.getenv("PGSSLMODE")
-        if sslmode:
-            kwargs["sslmode"] = sslmode
-        elif _needs_ssl(DATABASE_URL):
-            kwargs["sslmode"] = "require"
-        return psycopg2.connect(DATABASE_URL, **kwargs)
+        if "sslmode=" not in db_url.lower():
+            sslmode = os.getenv("PGSSLMODE")
+            if sslmode:
+                kwargs["sslmode"] = sslmode
+            elif _needs_ssl(db_url):
+                kwargs["sslmode"] = "require"
+
+        try:
+            return psycopg2.connect(db_url, **kwargs)
+        except Exception as e:
+            print(f"[DB NOTICE] Primary connect failed: {e}. Retrying with direct URL...")
+            kwargs.pop("sslmode", None)
+            return psycopg2.connect(db_url, **kwargs)
 
     passwords_to_try = [
         DB_PASSWORD,

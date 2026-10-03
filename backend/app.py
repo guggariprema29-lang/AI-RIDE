@@ -154,11 +154,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 def startup_event():
-    create_tables()
-    create_ride_tables()
-    create_notifications_table()
-    create_sos_tables()
-    create_parcels_table()
+    try:
+        create_tables()
+        create_ride_tables()
+        create_notifications_table()
+        create_sos_tables()
+        create_parcels_table()
+    except Exception as e:
+        print(f"[STARTUP NOTICE] Table initialization error: {e}")
 
 
 @app.get("/", response_model=dict)

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -45,27 +46,38 @@ class _ParcelSharingScreenState extends State<ParcelSharingScreen> with SingleTi
   }
 
   Future<void> _postParcel() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isPosting || !_formKey.currentState!.validate()) return;
     setState(() => _isPosting = true);
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final userId = authProvider.user?.id ?? 1;
 
+      final pickupText = _pickupController.text.trim();
+      final dropoffText = _dropoffController.text.trim();
+
       final payload = {
         'sender_id': userId,
+        'title': 'Parcel: $_category',
         'category': _category,
         'weight_kg': _weightKg,
-        'pickup_address': _pickupController.text.trim(),
-        'dropoff_address': _dropoffController.text.trim(),
+        'pickup': pickupText,
+        'dropoff': dropoffText,
+        'pickup_address': pickupText,
+        'dropoff_address': dropoffText,
         'pickup_lat': 12.9352,
         'pickup_lng': 77.6245,
+        'drop_lat': 12.9698,
+        'drop_lng': 77.7500,
         'dropoff_lat': 12.9698,
         'dropoff_lng': 77.7500,
         'receiver_name': _receiverNameController.text.trim(),
         'receiver_phone': _receiverPhoneController.text.trim(),
         'notes': 'Small non-commercial parcel.',
+        'fare': _calculatedFare,
       };
+
+      debugPrint('[PARCEL POST PAYLOAD] ${jsonEncode(payload)}');
 
       await authProvider.apiService.createParcel(payload);
 

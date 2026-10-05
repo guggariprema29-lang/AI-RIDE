@@ -4,6 +4,12 @@ venv/
 env/
 ENV/
 
+# Flutter build artifacts
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
 # Python cache
 __pycache__/
 *.py[cod]

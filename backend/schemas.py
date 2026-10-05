@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from typing import List, Optional, Any
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 
 
 class UserCreate(BaseModel):
@@ -260,21 +260,38 @@ class UserActivityUpdate(BaseModel):
 
 class ParcelCreate(BaseModel):
     sender_id: int
-    title: str
+    title: Optional[str] = None
     category: str = "documents"
     weight_kg: float = Field(default=1.0, le=5.0)
-    pickup: str
-    dropoff: str
+    pickup: Optional[str] = None
+    dropoff: Optional[str] = None
     pickup_lat: float
     pickup_lng: float
-    drop_lat: float
-    drop_lng: float
+    drop_lat: Optional[float] = None
+    drop_lng: Optional[float] = None
     receiver_name: str
     receiver_phone: str
     photo_url: Optional[str] = None
     notes: Optional[str] = None
     fare: float = Field(default=50.0, gt=0.0)
     women_only: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def alias_and_default_fields(cls, data: Any):
+        if isinstance(data, dict):
+            if not data.get("pickup") and data.get("pickup_address"):
+                data["pickup"] = data["pickup_address"]
+            if not data.get("dropoff") and data.get("dropoff_address"):
+                data["dropoff"] = data["dropoff_address"]
+            if data.get("drop_lat") is None and data.get("dropoff_lat") is not None:
+                data["drop_lat"] = data["dropoff_lat"]
+            if data.get("drop_lng") is None and data.get("dropoff_lng") is not None:
+                data["drop_lng"] = data["dropoff_lng"]
+            if not data.get("title"):
+                cat = data.get("category", "Parcel")
+                data["title"] = f"Parcel: {cat}"
+        return data
 
 
 class ParcelAcceptRequest(BaseModel):

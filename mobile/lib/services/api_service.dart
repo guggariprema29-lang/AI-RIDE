@@ -332,7 +332,18 @@ class ApiService {
 
       final detail = err['detail'] ?? err['message'];
       if (detail != null && detail.toString().trim().isNotEmpty) {
-        throw Exception(detail.toString().trim());
+        String cleaned = detail.toString().trim();
+        print('[AUTH API ERROR DETAIL] $cleaned');
+        
+        // Filter raw internal database host connection errors into user-friendly message
+        if (cleaned.contains('could not translate host name') ||
+            cleaned.contains('Name or service not known') ||
+            cleaned.contains('psycopg2') ||
+            cleaned.contains('OperationalError') ||
+            cleaned.contains('dpg-')) {
+          throw Exception('Unable to connect to the server. Please try again.');
+        }
+        throw Exception(cleaned);
       }
 
       switch (response.statusCode) {
@@ -345,7 +356,8 @@ class ApiService {
         case 422:
           throw Exception('Invalid input format. Please check the entered data.');
         case 500:
-          throw Exception('Server error. Please try again in a few moments.');
+        case 503:
+          throw Exception('Unable to connect to the server. Please try again.');
         default:
           throw Exception('Server request failed with code ${response.statusCode}.');
       }

@@ -174,6 +174,29 @@ def health_check():
     return {"status": "ok"}
 
 
+@app.get("/health/db")
+def health_db_check():
+    try:
+        from database import get_connection
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+            cur.fetchone()
+        conn.close()
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        print(f"[HEALTH DB ERROR] Database connection failed: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "database": "disconnected",
+                "detail": f"Could not connect to PostgreSQL database: {str(e)}",
+                "instruction": "Please verify that the current Internal Database URL from Render PostgreSQL is set as the DATABASE_URL environment variable in your Render Web Service."
+            }
+        )
+
+
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int):
     """Real-Time WebSocket Manager endpoint for live chat and notifications."""

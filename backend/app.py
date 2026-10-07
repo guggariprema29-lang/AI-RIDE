@@ -245,12 +245,12 @@ def register_user_info():
 def register_user(user: UserCreate):
     print(f"[AUTH LOG] REGISTER REQUEST RECEIVED - Email: {user.email}, Phone: {user.phone}, Name: {user.name}")
     try:
-        # Step 1: Pre-check duplicate email/phone
-        from models import get_user_by_email, get_connection
+        # Step 1: Pre-check duplicate email / phone / government ID
+        from models import get_user_by_email, get_user_by_government_id, get_connection
         if user.email and get_user_by_email(user.email):
             print(f"[AUTH LOG] REGISTER CONFLICT - Email {user.email} already exists")
-            raise HTTPException(status_code=409, detail="An account with this email address already exists. Please sign in.")
-            
+            raise HTTPException(status_code=409, detail="An account with this email address already exists. Please sign in instead.")
+
         clean_phone = re.sub(r"\D", "", user.phone.strip()) if user.phone else ""
         if clean_phone:
             conn = get_connection()
@@ -260,8 +260,19 @@ def register_user(user: UserCreate):
                 if cur.fetchone():
                     conn.close()
                     print(f"[AUTH LOG] REGISTER CONFLICT - Phone {user.phone} already exists")
-                    raise HTTPException(status_code=409, detail="An account with this phone number already exists. Please sign in.")
+                    raise HTTPException(status_code=409, detail="An account with this phone number already exists. Please sign in instead.")
             conn.close()
+
+        # Pre-check government ID uniqueness (Aadhaar / PAN / DL)
+        if user.government_id:
+            clean_gov = user.government_id.strip().upper().replace(" ", "").replace("-", "")
+            existing_gov = get_user_by_government_id(clean_gov)
+            if existing_gov:
+                print(f"[AUTH LOG] REGISTER CONFLICT - Government ID {clean_gov} already exists")
+                raise HTTPException(
+                    status_code=409,
+                    detail="An account is already registered with this Government ID (Aadhaar/PAN/DL). Each ID can only be used once. Please sign in instead."
+                )
 
         trust_score = calculate_trust_score(
             face_verified=user.face_verified,
@@ -296,13 +307,22 @@ def register_user(user: UserCreate):
     except HTTPException:
         raise
     except Exception as e:
-        err_str = str(e)
-        if "unique" in err_str.lower() or "duplicate" in err_str.lower() or "already exists" in err_str.lower() or isinstance(e, psycopg2.errors.UniqueViolation):
-            print(f"[AUTH LOG] REGISTER FAILED - Account already exists: {err_str}")
-            raise HTTPException(status_code=409, detail="An account with this email or phone number already exists.")
-        print(f"[AUTH LOG] REGISTER ERROR: {err_str}")
+        err_str = str(e).lower()
+        is_unique = "unique" in err_str or "duplicate" in err_str or "already exists" in err_str or isinstance(e, psycopg2.errors.UniqueViolation)
+        if is_unique:
+            print(f"[AUTH LOG] REGISTER FAILED - UniqueViolation: {err_str}")
+            if "government_id" in err_str:
+                detail = "An account is already registered with this Government ID (Aadhaar/PAN/DL). Each ID can only be used once. Please sign in instead."
+            elif "email" in err_str:
+                detail = "An account with this email address already exists. Please sign in instead."
+            elif "phone" in err_str:
+                detail = "An account with this phone number already exists. Please sign in instead."
+            else:
+                detail = "An account with these details already exists. Please sign in instead."
+            raise HTTPException(status_code=409, detail=detail)
+        print(f"[AUTH LOG] REGISTER ERROR: {str(e)}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Registration error: {err_str}")
+        raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
 
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────

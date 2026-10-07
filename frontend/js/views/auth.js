@@ -93,8 +93,15 @@ export function loginView(container, query) {
       afterAuth(user, query.next);
     } catch (error) {
       const message = error instanceof ApiError ? error.message : 'Sign in failed';
-      if (message.toLowerCase().includes('password')) fieldError(password, message);
-      else fieldError(email, message);
+      // Show a helpful hint if they might need to register first
+      if (error.status === 401) {
+        fieldError(email, message);
+        fieldError(password, 'Check your password — or create an account if you haven\'t registered yet');
+      } else if (message.toLowerCase().includes('password')) {
+        fieldError(password, message);
+      } else {
+        fieldError(email, message);
+      }
       toast(message, 'error');
     } finally {
       setBusy(button, false);
@@ -261,7 +268,16 @@ export function signupView(container, query) {
       });
       afterAuth(user, query.next);
     } catch (error) {
-      toast(error.message, 'error');
+      const msg = error.message || 'Registration failed';
+      // Route the error to the correct field so the user knows exactly what to fix
+      if (msg.toLowerCase().includes('email')) {
+        fieldError(fields.email, msg);
+      } else if (msg.toLowerCase().includes('phone')) {
+        fieldError(fields.phone, msg);
+      } else if (msg.toLowerCase().includes('government id') || msg.toLowerCase().includes('aadhaar') || msg.toLowerCase().includes('pan') || msg.toLowerCase().includes('driving')) {
+        fieldError(fields.gov, msg);
+      }
+      toast(msg, 'error');
     } finally {
       setBusy(button, false);
     }

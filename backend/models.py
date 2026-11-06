@@ -127,6 +127,21 @@ def create_tables():
             "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;",
             "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;",
             "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by TEXT DEFAULT 'passenger';",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS platform_fee REAL DEFAULT 0.0;",
+            "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rider_payout REAL DEFAULT 0.0;",
+            "ALTER TABLE parcels ADD COLUMN IF NOT EXISTS platform_fee REAL DEFAULT 0.0;",
+            "ALTER TABLE parcels ADD COLUMN IF NOT EXISTS rider_payout REAL DEFAULT 0.0;",
+            """CREATE TABLE IF NOT EXISTS platform_revenue (
+                id SERIAL PRIMARY KEY,
+                source_type TEXT NOT NULL,
+                source_id INTEGER NOT NULL,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                gross_amount REAL NOT NULL,
+                platform_fee REAL NOT NULL,
+                commission_percent REAL DEFAULT 5.0,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );""",
+            "CREATE INDEX IF NOT EXISTS idx_platform_revenue_source ON platform_revenue(source_type, source_id);",
             """CREATE TABLE IF NOT EXISTS cancellation_history (
                 id SERIAL PRIMARY KEY,
                 booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
@@ -569,3 +584,62 @@ def get_trip_chat_messages(booking_id: int) -> list[dict]:
         rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def record_platform_revenue(source_type: str, source_id: int, user_id: int, gross_amount: float, platform_fee: float, commission_percent: float = 5.0) -> None:
+    """Records platform commission into the revenue ledger."""
+    create_tables()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO platform_revenue (source_type, source_id, user_id, gross_amount, platform_fee, commission_percent)
+                VALUES (%s, %s, %s, %s, %s, %s);
+                """,
+                (source_type, source_id, user_id, float(gross_amount), float(platform_fee), float(commission_percent))
+            )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"[REVENUE NOTICE] Error recording platform revenue: {e}")
+    finally:
+        conn.close()
+
+
+def get_platform_revenue_summary() -> dict:
+    """Aggregates platform commission statistics and returns recent revenue records."""
+    create_tables()
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) AS total_transactions,
+                    COALESCE(SUM(gross_amount), 0.0) AS total_gross_volume,
+                    COALESCE(SUM(platform_fee), 0.0) AS total_platform_commission,
+                    COALESCE(SUM(gross_amount - platform_fee), 0.0) AS total_rider_payouts
+                FROM platform_revenue;
+            """)
+            summary = cursor.fetchone() or {}
+            
+            cursor.execute("""
+                SELECT * FROM platform_revenue ORDER BY created_at DESC LIMIT 25;
+            """)
+            recent = []
+            for r in cursor.fetchall():
+                d = dict(r)
+                if hasattr(d.get("created_at"), "isoformat"):
+                    d["created_at"] = d["created_at"].isoformat()
+                recent.append(d)
+        return {
+            "commission_rate_percent": 5.0,
+            "total_transactions": summary.get("total_transactions", 0),
+            "total_gross_volume": round(float(summary.get("total_gross_volume") or 0.0), 2),
+            "total_platform_commission": round(float(summary.get("total_platform_commission") or 0.0), 2),
+            "total_rider_payouts": round(float(summary.get("total_rider_payouts") or 0.0), 2),
+            "recent_transactions": recent
+        }
+    finally:
+        conn.close()
+

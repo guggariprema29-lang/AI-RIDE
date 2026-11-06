@@ -395,6 +395,11 @@ def calculate_cost_savings(distance_m: float, vehicle_type: str = "car", seats: 
     savings_pct = round((savings_amount / commercial_fare) * 100) if commercial_fare > 0 else 0
     co2_saved_kg = round(distance_km * 0.15, 2)
     
+    # 5% Platform Infrastructure & Safety Fee
+    commission_rate = 5.0
+    platform_fee = round(cost_share * (commission_rate / 100.0), 2)
+    rider_payout = round(cost_share - platform_fee, 2)
+    
     return {
         "distance_km": distance_km,
         "vehicle_type": vehicle_type,
@@ -403,6 +408,10 @@ def calculate_cost_savings(distance_m: float, vehicle_type: str = "car", seats: 
         "fuel_liters": fuel_liters,
         "total_fuel_cost": total_fuel_cost,
         "cost_share": cost_share,
+        "base_fare": cost_share,
+        "platform_fee": platform_fee,
+        "commission_percent": commission_rate,
+        "rider_payout": rider_payout,
         "rider_fuel_offset": rider_fuel_offset,
         "commercial_name": commercial_name,
         "commercial_fare": commercial_fare,

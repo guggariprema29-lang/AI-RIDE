@@ -73,6 +73,8 @@ def create_parcels_table() -> None:
     with conn.cursor() as cursor:
         cursor.execute(CREATE_PARCELS_TABLE)
         cursor.execute("ALTER TABLE parcels ADD COLUMN IF NOT EXISTS women_only BOOLEAN DEFAULT FALSE;")
+        cursor.execute("ALTER TABLE parcels ADD COLUMN IF NOT EXISTS platform_fee REAL DEFAULT 0.0;")
+        cursor.execute("ALTER TABLE parcels ADD COLUMN IF NOT EXISTS rider_payout REAL DEFAULT 0.0;")
     conn.close()
 
 
@@ -135,15 +137,20 @@ def create_parcel(data: dict) -> tuple[Optional[dict], str]:
             pickup_otp = f"{secrets.randbelow(10000):04d}"
             delivery_otp = f"{secrets.randbelow(10000):04d}"
 
+            # Calculate 5% Platform Infrastructure & Safety Fee
+            total_fare = round(float(fare or 0.0), 2)
+            platform_fee = round(total_fare * 0.05, 2)
+            rider_payout = round(total_fare - platform_fee, 2)
+
             cursor.execute(
                 """
                 INSERT INTO parcels (
                     sender_id, title, category, weight_kg, pickup, dropoff,
                     pickup_lat, pickup_lng, drop_lat, drop_lng,
                     receiver_name, receiver_phone, photo_url, notes,
-                    fare, status, women_only, pickup_otp, delivery_otp
+                    fare, platform_fee, rider_payout, status, women_only, pickup_otp, delivery_otp
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s)
                 RETURNING id;
                 """,
                 (
@@ -161,7 +168,9 @@ def create_parcel(data: dict) -> tuple[Optional[dict], str]:
                     data["receiver_phone"],
                     data.get("photo_url"),
                     data.get("notes"),
-                    fare,
+                    total_fare,
+                    platform_fee,
+                    rider_payout,
                     bool(data.get("women_only", False)),
                     pickup_otp,
                     delivery_otp
@@ -344,17 +353,20 @@ def verify_parcel_delivery(parcel_id: int, otp: str) -> tuple[Optional[dict], st
         return None, f"Incorrect Delivery OTP '{given_otp}'. Expected OTP is {expected_otp}."
 
     fare = float(parcel.get("fare") or 0.0)
+    platform_fee = float(parcel.get("platform_fee") or round(fare * 0.05, 2))
+    rider_payout = round(fare - platform_fee, 2)
     sender_id = parcel["sender_id"]
     rider_id = parcel["rider_id"]
 
     conn = get_connection()
     try:
         with conn.cursor() as cursor:
-            # Release escrow from sender and credit to rider
+            # 1. Release full fare escrow from sender
             cursor.execute(
                 "UPDATE users SET escrow_balance = GREATEST(0.0, escrow_balance - %s) WHERE id = %s;",
                 (fare, sender_id)
             )
+            # 2. Credit rider_payout (95%) to rider wallet
             cursor.execute(
                 """
                 UPDATE users
@@ -362,11 +374,12 @@ def verify_parcel_delivery(parcel_id: int, otp: str) -> tuple[Optional[dict], st
                     completed_deliveries = completed_deliveries + 1
                 WHERE id = %s;
                 """,
-                (fare, rider_id)
+                (rider_payout, rider_id)
             )
+            # 3. Update parcel status & fee ledger
             cursor.execute(
-                "UPDATE parcels SET status = 'delivered', updated_at = NOW() WHERE id = %s;",
-                (parcel_id,)
+                "UPDATE parcels SET status = 'delivered', platform_fee = %s, rider_payout = %s, updated_at = NOW() WHERE id = %s;",
+                (platform_fee, rider_payout, parcel_id)
             )
         conn.commit()
     except Exception as e:
@@ -374,6 +387,20 @@ def verify_parcel_delivery(parcel_id: int, otp: str) -> tuple[Optional[dict], st
         return None, f"Database error completing parcel delivery: {str(e)}"
     finally:
         conn.close()
+
+    # 4. Record platform revenue (5% logistics facilitation fee)
+    try:
+        from models import record_platform_revenue
+        record_platform_revenue(
+            source_type="parcel",
+            source_id=parcel_id,
+            user_id=sender_id,
+            gross_amount=fare,
+            platform_fee=platform_fee,
+            commission_percent=5.0
+        )
+    except Exception as e:
+        print(f"[REVENUE NOTICE] Non-blocking parcel revenue log error: {e}")
 
     # Recalculate rider trust score
     from models import recalculate_user_trust

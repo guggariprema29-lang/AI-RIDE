@@ -162,6 +162,7 @@ export const api = {
   wallet: (userId) => request(`/wallet/balance/${userId}`),
   deposit: (userId, amount) =>
     request('/wallet/deposit', { method: 'POST', body: { user_id: userId, amount } }),
+  platformRevenue: () => request('/platform/revenue'),
 
   createParcel: (payload) => request('/parcels/create', { method: 'POST', body: payload }),
   senderParcels: (senderId) => request(`/parcels/sender/${senderId}`),

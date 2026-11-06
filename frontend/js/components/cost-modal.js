@@ -42,7 +42,7 @@ export async function showCostBreakdownModal(options = {}) {
         <span style="font-size:24px">🧾</span>
         <h3 style="margin:0">${escapeHtml(title)}</h3>
       </div>
-      <p class="xsmall muted" style="margin:0">Verified zero-commission cost-share receipt based on live distance & fuel rates.</p>
+      <p class="xsmall muted" style="margin:0">Verified 5% platform infrastructure & cost-share receipt based on distance and fuel rates.</p>
 
       <div data-modal-content class="stack" style="gap:var(--space-4);margin-top:var(--space-3)">
         <div class="muted small text-center" style="padding:var(--space-4)">Calculating fuel & savings breakdown...</div>
@@ -75,6 +75,9 @@ export async function showCostBreakdownModal(options = {}) {
 
     const isCar = res.vehicle_type.toLowerCase() === 'car';
     const isParcel = res.is_parcel;
+    const baseFare = Number(res.base_fare || res.cost_share || 0);
+    const platformFee = Number(res.platform_fee || (baseFare * 0.05)).toFixed(2);
+    const riderPayout = Number(res.rider_payout || (baseFare - platformFee)).toFixed(2);
 
     contentNode.innerHTML = `
       <div class="grid grid-2" style="gap:var(--space-3)">
@@ -91,11 +94,19 @@ export async function showCostBreakdownModal(options = {}) {
 
       <div class="card stack" style="background:var(--color-surface);border:1px solid var(--color-accent-soft);padding:var(--space-4)">
         <div class="row-tight" style="justify-content:space-between">
-          <span class="small font-bold">🤝 Zero-Commission Cost Share</span>
-          <span class="badge badge-success" style="font-size:0.9rem">₹${res.cost_share}</span>
+          <span class="small font-bold">🤝 Fuel Cost Share (Total)</span>
+          <span class="badge badge-success" style="font-size:0.95rem">₹${baseFare.toFixed(2)}</span>
         </div>
-        <div class="xsmall muted" style="margin-top:2px">
-          Rider Total Fuel Bill: <strong>₹${res.total_fuel_cost}</strong> · Rider Offset: <strong>₹${res.rider_fuel_offset}</strong>
+        <div class="row-tight" style="justify-content:space-between;margin-top:var(--space-2);border-top:1px dashed var(--color-border);padding-top:var(--space-2)">
+          <span class="xsmall muted">🛡️ Platform Safety & Tech Fee (5%)</span>
+          <span class="xsmall font-bold" style="color:var(--color-accent)">₹${platformFee}</span>
+        </div>
+        <div class="row-tight" style="justify-content:space-between;margin-top:var(--space-1)">
+          <span class="xsmall muted">👤 Rider Net Fuel Recovery (95%)</span>
+          <span class="xsmall font-bold" style="color:var(--color-success)">₹${riderPayout}</span>
+        </div>
+        <div class="xsmall muted" style="margin-top:6px">
+          Rider Total Fuel Bill: <strong>₹${res.total_fuel_cost}</strong> · Rider Fuel Offset: <strong>₹${res.rider_fuel_offset}</strong>
         </div>
       </div>
 

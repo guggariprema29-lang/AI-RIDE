@@ -1,8 +1,11 @@
 """Cost sharing & fare breakdown calculation module.
 
-Calculates fuel cost share, passenger fare breakdown, savings vs commercial taxi,
-and cost split per passenger.
+Calculates fuel cost share, 5% platform infrastructure & safety fee,
+rider payout, passenger fare breakdown, and savings vs commercial taxi.
 """
+
+# Configurable Platform Fee / Commission percentage (5% nominal infrastructure & safety fee)
+COMMISSION_PERCENT = 5.0
 
 # Average fuel mileage by vehicle type (km per liter)
 VEHICLE_MILEAGE = {
@@ -23,15 +26,20 @@ def calculate_cost_split(
     total_ride_distance_m: float = 0.0,
     fare_per_km: float = 6.0,
     seats: int = 1,
-    vehicle_type: str = "car"
+    vehicle_type: str = "car",
+    commission_percent: float = COMMISSION_PERCENT
 ) -> dict:
-    """Calculates complete cost sharing breakdown between rider and passenger(s)."""
+    """Calculates complete cost sharing breakdown between rider, passenger(s), and platform service fee."""
     shared_km = max(0.1, shared_distance_m / 1000.0)
     total_km = max(shared_km, total_ride_distance_m / 1000.0) if total_ride_distance_m > 0 else shared_km
 
-    # Passenger cost share fare
+    # Passenger cost share fare (base fuel split)
     fare_total = round(shared_km * fare_per_km * seats, 2)
     fare_per_seat = round(fare_total / max(1, seats), 2)
+
+    # 5% Platform Infrastructure & Safety Fee
+    platform_fee = round(fare_total * (commission_percent / 100.0), 2)
+    rider_payout = round(fare_total - platform_fee, 2)
 
     # Estimated fuel consumption for the shared leg
     mileage = VEHICLE_MILEAGE.get(vehicle_type.lower(), 15.0)
@@ -52,6 +60,10 @@ def calculate_cost_split(
         "seats_booked": seats,
         "fare_per_km": fare_per_km,
         "total_fare": fare_total,
+        "base_fare": fare_total,
+        "platform_fee": platform_fee,
+        "commission_percent": commission_percent,
+        "rider_payout": rider_payout,
         "fare_per_seat": fare_per_seat,
         "estimated_fuel_liters": fuel_liters,
         "estimated_fuel_cost": fuel_cost_shared_leg,

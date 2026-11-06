@@ -313,6 +313,11 @@ def create_booking(data: dict) -> Optional[dict]:
                 conn.rollback()
                 return None
 
+            # Calculate 5% Platform Infrastructure & Safety Fee
+            total_fare = round(float(data.get("fare", 0.0) or 0.0), 2)
+            platform_fee = round(total_fare * 0.05, 2)
+            rider_payout = round(total_fare - platform_fee, 2)
+
             # The passenger reads this code out at pickup; the rider types it in
             # to start the trip, which proves both parties actually met.
             otp = f"{secrets.randbelow(10000):04d}"
@@ -321,9 +326,9 @@ def create_booking(data: dict) -> Optional[dict]:
                 INSERT INTO bookings (
                     ride_id, passenger_id, pickup, dropoff,
                     pickup_lat, pickup_lng, drop_lat, drop_lng,
-                    seats, fare, overlap_score, detour_m, status, otp
+                    seats, fare, platform_fee, rider_payout, overlap_score, detour_m, status, otp
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s)
                 RETURNING *;
                 """,
                 (
@@ -336,7 +341,9 @@ def create_booking(data: dict) -> Optional[dict]:
                     data["drop_lat"],
                     data["drop_lng"],
                     requested_seats,
-                    data.get("fare", 0.0),
+                    total_fare,
+                    platform_fee,
+                    rider_payout,
                     data.get("overlap_score", 0.0),
                     data.get("detour_m", 0.0),
                     otp,
@@ -488,6 +495,9 @@ def pay_booking(booking_id: int) -> tuple[Optional[dict], str]:
         return None, "Payment opens once the trip is completed."
 
     amount = float(booking["fare"] or 0)
+    platform_fee = float(booking.get("platform_fee") or round(amount * 0.05, 2))
+    rider_payout = round(amount - platform_fee, 2)
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -500,21 +510,24 @@ def pay_booking(booking_id: int) -> tuple[Optional[dict], str]:
                 conn.rollback()
                 return None, "Not enough balance in your wallet. Add money and try again."
 
+            # 1. Deduct full fare from passenger's wallet
             cursor.execute(
                 "UPDATE users SET wallet_balance = wallet_balance - %s WHERE id = %s;",
                 (amount, booking["passenger_id"]),
             )
+            # 2. Credit rider_payout (95%) to rider's wallet
             cursor.execute(
                 """
                 UPDATE users SET wallet_balance = wallet_balance + %s,
                                  completed_deliveries = completed_deliveries + 1
                 WHERE id = (SELECT rider_id FROM rides WHERE id = %s);
                 """,
-                (amount, booking["ride_id"]),
+                (rider_payout, booking["ride_id"]),
             )
+            # 3. Mark booking paid and record fee
             cursor.execute(
-                "UPDATE bookings SET status = 'paid', paid_at = NOW(), updated_at = NOW() WHERE id = %s;",
-                (booking_id,),
+                "UPDATE bookings SET status = 'paid', paid_at = NOW(), platform_fee = %s, rider_payout = %s, updated_at = NOW() WHERE id = %s;",
+                (platform_fee, rider_payout, booking_id),
             )
         conn.commit()
     except Exception:
@@ -522,6 +535,21 @@ def pay_booking(booking_id: int) -> tuple[Optional[dict], str]:
         raise
     finally:
         conn.close()
+
+    # 4. Record platform revenue (5% technology & safety fee)
+    try:
+        from models import record_platform_revenue
+        record_platform_revenue(
+            source_type="ride",
+            source_id=booking_id,
+            user_id=booking["passenger_id"],
+            gross_amount=amount,
+            platform_fee=platform_fee,
+            commission_percent=5.0
+        )
+    except Exception as e:
+        print(f"[REVENUE NOTICE] Non-blocking revenue log error: {e}")
+
     return get_booking(booking_id), ""
 
 

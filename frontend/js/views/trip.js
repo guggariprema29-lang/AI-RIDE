@@ -332,9 +332,17 @@ export default function tripView(container, query) {
           </div>
           <button class="btn btn-primary btn-lg" data-pay>${icon('wallet', 18)} Pay from wallet</button>
         </div>
-        <p class="xsmall muted" style="margin:var(--space-3) 0 0">
-          Cost share only — no commission is taken. Top up in <a href="#/profile">your profile</a> if the balance is short.
-        </p>
+        <div class="xsmall muted" style="margin:var(--space-3) 0 0; display:flex; flex-direction:column; gap:4px">
+          <div style="display:flex; justify-content:space-between">
+            <span>Rider fuel recovery (95%):</span>
+            <strong>${rupees(Math.round(booking.fare * 0.95))}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between">
+            <span>Platform safety & infra fee (5%):</span>
+            <strong>${rupees(Math.max(1, Math.round(booking.fare * 0.05)))}</strong>
+          </div>
+          <span style="margin-top:2px">Top up in <a href="#/profile">your profile</a> if balance is short.</span>
+        </div>
       `;
     }
     return ratingForm('passenger');

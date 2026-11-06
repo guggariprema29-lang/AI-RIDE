@@ -725,6 +725,13 @@ def get_ride_cost_split(ride_id: int, shared_distance_m: Optional[float] = None)
     return split
 
 
+@app.get("/platform/revenue")
+def get_platform_revenue_endpoint():
+    """Returns platform 5% commission statistics, revenue ledger, and monetization breakdown."""
+    from models import get_platform_revenue_summary
+    return get_platform_revenue_summary()
+
+
 @app.post("/payments/create-session")
 def create_payment_session_endpoint(payload: dict):
     user_id = payload.get("user_id")

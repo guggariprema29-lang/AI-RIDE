@@ -133,8 +133,8 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         *_extra_origins,
     ],
-    # Local dev on any port, plus Vercel preview and production deployments.
-    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+):\d+|https://.*\.vercel\.app)$",
+    # Local dev on any port, plus Vercel and Render deployments.
+    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+):\d+|https://.*\.vercel\.app|https://.*\.onrender\.com)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

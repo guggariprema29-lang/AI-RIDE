@@ -26,7 +26,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userId = authProvider.user?.id ?? 1;
     try {
-      final res = await authProvider.apiService.getPassengerBookings(userId); // fallback or notification API
+      await authProvider.apiService.getPassengerBookings(userId); // fallback or notification API
       if (!mounted) return;
       setState(() {
         _notifications = [

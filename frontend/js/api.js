@@ -12,8 +12,11 @@ function resolveApiBase() {
   const stored = localStorage.getItem('airide_api_base');
   if (stored) return stored.replace(/\/$/, '');
 
-  const host = (typeof window !== 'undefined' && window.location.hostname) || '127.0.0.1';
-  const isLocal = host === '127.0.0.1' || host === 'localhost' || host.startsWith('192.168.') || host.startsWith('10.');
+  const isBrowser = typeof window !== 'undefined';
+  const isFile = isBrowser && window.location.protocol === 'file:';
+  const rawHost = isBrowser ? window.location.hostname : '127.0.0.1';
+  const host = rawHost || '127.0.0.1';
+  const isLocal = isFile || host === '127.0.0.1' || host === 'localhost' || host.startsWith('192.168.') || host.startsWith('10.');
 
   const meta = document.querySelector('meta[name="airide-api"]')?.content?.trim();
   if (meta && !isLocal) return meta.replace(/\/$/, '');
@@ -39,22 +42,41 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   if (body) headers['Content-Type'] = 'application/json';
   if (store.token) headers['Authorization'] = `Bearer ${store.token}`;
 
+  // Enforce a 15-second timeout so user actions never spin indefinitely
+  const timeoutMs = 15000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Link caller signal if passed
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+  }
+
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: Object.keys(headers).length ? headers : undefined,
       body: body ? JSON.stringify(body) : undefined,
-      signal,
+      signal: controller.signal,
     });
   } catch (error) {
-    if (error.name === 'AbortError') throw error;
+    clearTimeout(timer);
+    if (error.name === 'AbortError') {
+      if (signal?.aborted) throw error;
+      throw new ApiError(
+        `Request timed out after 15 seconds. Please ensure the backend is running at ${API_BASE_URL}.`,
+        408
+      );
+    }
     const hosted = !API_BASE_URL.includes('127.0.0.1') && !API_BASE_URL.includes('localhost');
     throw new ApiError(
       hosted
         ? `Cannot reach the API at ${API_BASE_URL}. A free Render service sleeps when idle — wait about a minute and try again.`
-        : `Cannot reach the API at ${API_BASE_URL}. Start the backend: cd backend && python -m uvicorn app:app --port 8000`,
+        : `Cannot reach the API at ${API_BASE_URL}. Start the backend: python -m uvicorn app:app --port 8000`,
       0
     );
+  } finally {
+    clearTimeout(timer);
   }
 
   const text = await response.text();

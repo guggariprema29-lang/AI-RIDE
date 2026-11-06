@@ -20,7 +20,6 @@ class LiveTrackingScreen extends StatefulWidget {
 class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   late BookingModel _booking;
   Timer? _locationTimer;
-  final _otpController = TextEditingController();
 
   LatLng get _vehicleLocation => LatLng(_booking.pickupLat, _booking.pickupLng);
 

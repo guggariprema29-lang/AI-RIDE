@@ -4,6 +4,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/pulse_ring.dart';
 import '../../providers/auth_provider.dart';
 import '../rides/offer_ride_screen.dart';
 import '../rides/search_ride_screen.dart';
@@ -41,33 +43,50 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.darkBackground,
       body: pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.darkSurface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.darkTextSecondary,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.map_outlined), activeIcon: Icon(Icons.map), label: 'Explore'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Find Ride'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: 'Parcels'),
-          BottomNavigationBarItem(icon: Icon(Icons.confirmation_number_outlined), activeIcon: Icon(Icons.confirmation_number), label: 'My Trips'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.darkSurface.withOpacity(0.95),
+          border: const Border(
+            top: BorderSide(color: AppColors.darkBorderSubtle, width: 1),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.darkTextDim,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore), label: 'Explore'),
+            BottomNavigationBarItem(icon: Icon(Icons.search_rounded), label: 'Find Ride'),
+            BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: 'Parcels'),
+            BottomNavigationBarItem(icon: Icon(Icons.confirmation_number_outlined), activeIcon: Icon(Icons.confirmation_number), label: 'My Trips'),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.danger,
-        elevation: 6,
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SosScreen()),
-          );
-        },
-        child: const Text(
-          'SOS',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+      floatingActionButton: PulseRing(
+        size: 70,
+        color: AppColors.danger,
+        child: FloatingActionButton(
+          backgroundColor: AppColors.danger,
+          elevation: 8,
+          shape: const CircleBorder(),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SosScreen()),
+            );
+          },
+          child: const Text(
+            'SOS',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
+          ),
         ),
       ),
     );
@@ -93,15 +112,27 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 markers: [
                   Marker(
                     point: _currentLocation,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.3),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 2),
+                    width: 60,
+                    height: 60,
+                    child: PulseRing(
+                      size: 60,
+                      color: AppColors.primary,
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.5),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.navigation, color: Colors.white, size: 14),
                       ),
-                      child: const Icon(Icons.my_location, color: AppColors.primary, size: 24),
                     ),
                   ),
                 ],
@@ -109,26 +140,39 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             ],
           ),
 
-          // Header Bar
+          // Header Bar (Floating Dynamic Island Capsule)
           Positioned(
-            top: 16,
+            top: 14,
             left: 16,
             right: 16,
-            child: Container(
+            child: GlassCard(
+              borderRadius: 20,
+              blur: 24,
+              backgroundColor: Colors.black.withOpacity(0.65),
+              borderColor: Colors.white.withOpacity(0.14),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.darkSurface.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.darkBorder),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
-              ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.carCyan],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -137,20 +181,34 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Hello, ${user?.name.split(' ')[0] ?? 'User'} 👋',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          'Hello, ${user?.name.split(' ')[0] ?? 'Explorer'} 👋',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            letterSpacing: -0.3,
+                            color: AppColors.darkTextPrimary,
+                          ),
                         ),
+                        const SizedBox(height: 3),
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.secondary.withOpacity(0.2),
+                                color: AppColors.secondary.withOpacity(0.18),
                                 borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: AppColors.secondary.withOpacity(0.35),
+                                  width: 1,
+                                ),
                               ),
                               child: Text(
                                 'Trust Score: ${user?.trustScore ?? 85}/100',
-                                style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -159,7 +217,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded),
+                    icon: const Icon(Icons.notifications_none_rounded, color: AppColors.darkTextPrimary),
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const NotificationScreen()),
@@ -171,19 +229,19 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             ),
           ),
 
-          // Action Drawer Sheet
+          // Action Drawer Sheet (Glassmorphic Bento Card)
           Positioned(
             bottom: 16,
             left: 16,
             right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.darkSurface.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.darkBorder),
-                boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 16)],
-              ),
+            child: GlassCard(
+              borderRadius: 22,
+              blur: 26,
+              backgroundColor: Colors.black.withOpacity(0.75),
+              borderColor: Colors.white.withOpacity(0.14),
+              hasGlow: true,
+              glowColor: AppColors.primary,
+              padding: const EdgeInsets.all(18),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -216,17 +274,25 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Wallet: ${Formatters.rupees(user?.walletBalance ?? 500.0)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppColors.darkTextPrimary,
+                        ),
                       ),
                       const Text(
                         'Decentralised Cost Share • 0% Commission',
-                        style: TextStyle(fontSize: 11, color: AppColors.darkTextSecondary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.darkTextDim,
+                          letterSpacing: -0.1,
+                        ),
                       ),
                     ],
                   ),
@@ -245,23 +311,29 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: color.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.28), width: 1),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              children: [
+                Icon(icon, color: color, size: 28),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 14),
+                ),
+              ],
+            ),
           ),
         ),
       ),

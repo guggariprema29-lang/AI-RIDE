@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>AIRide – Schedule Ride</title>
+  <meta name="description" content="AIRide Schedule – Reserve and schedule future rides or package courier journeys."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <script>
+    (function() {
+      if (!sessionStorage.getItem('airide_user')) {
+        window.location.href = 'auth.html';
+      }
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- ── Particles background ── -->
+  <div class="particles" id="particles"></div>
+
+  <!-- ── Top Nav ── -->
+  <nav class="topnav">
+    <div class="nav-brand" style="cursor: pointer;" onclick="window.location.href='index.html'">
+      <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="10" fill="url(#ng1)"/>
+        <path d="M8 26l6-10 5 7 4-5 9 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="30" cy="14" r="4" fill="white" opacity="0.9"/>
+        <defs><linearGradient id="ng1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#C026D3"/></linearGradient></defs>
+      </svg>
+      <span class="brand-text">AI<span>Ride</span></span>
+    </div>
+    <div class="nav-user" id="nav-user">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <span class="user-name" id="user-name-nav">Loading...</span>
+      <button class="btn-logout" id="btn-logout">Log out</button>
+    </div>
+  </nav>
+
+  <!-- ── Main content ── -->
+  <main class="main-wrap">
+
+    <!-- ══ SCHEDULE TAB PANEL ══ -->
+    <div id="tab-schedule" class="tab-panel">
+      <div class="tab-panel-header">
+        <h2>Schedule a Future Journey</h2>
+        <p>Pre-reserve your routes or dispatch items for later matches</p>
+      </div>
+
+      <!-- Schedule Form -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(245, 158, 11, 0.15); color: #FCD34D;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <h2>Schedule Route Details</h2>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-row">
+            <div class="field-group">
+              <label>Origin Address</label>
+              <input type="text" id="sched-origin" placeholder="e.g. Majestic, Bengaluru">
+            </div>
+            <div class="field-group">
+              <label>Destination Address</label>
+              <input type="text" id="sched-dest" placeholder="e.g. Hebbal, Bengaluru">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field-group">
+              <label>Departure Date &amp; Time</label>
+              <input type="datetime-local" id="sched-time">
+            </div>
+            <div class="field-group">
+              <label>Journey Category</label>
+              <select id="sched-category" onchange="toggleSchedCourierFields()">
+                <option value="traveler">Traveler / Ride Match</option>
+                <option value="courier">Courier Package Delivery</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Courier Details Row (Shown only if category == courier) -->
+          <div id="sched-courier-row" class="form-row" style="display: none; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 14px;">
+            <div class="field-group">
+              <label>Package Weight (kg)</label>
+              <input type="number" id="sched-weight" placeholder="e.g. 2.5" min="0.1" step="0.1" value="1.0">
+            </div>
+            <div class="field-group">
+              <label>Package Category</label>
+              <select id="sched-pkg-cat">
+                <option value="documents">📄 Documents / Letters</option>
+                <option value="electronics">💻 Electronics / Accessories</option>
+                <option value="clothing">👕 Clothing / Apparel</option>
+                <option value="box">📦 Box / General Cargo</option>
+                <option value="food">🍕 Food / Perishables</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="btn-primary" onclick="scheduleRideSubmit()" style="margin-top: 6px;">Schedule &amp; Publish</button>
+        </div>
+      </div>
+
+      <!-- Scheduled Journeys List -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(16, 185, 129, 0.15); color: #6EE7B7;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h2>Your Scheduled Journeys</h2>
+        </div>
+
+        <div id="scheduled-rides-list" style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="rides-empty" style="padding: 30px 10px;">
+            <p>No scheduled rides yet. Fill out the form above to reserve a future route!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══ Bottom Nav ══ -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bnav-item" id="bnav-home" onclick="window.location.href='index.html?tab=home'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <span>Home</span>
+    </button>
+    <button class="bnav-item active" id="bnav-services" onclick="window.location.href='index.html?tab=services'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      </div>
+      <span>Services</span>
+    </button>
+    <button class="bnav-item" id="bnav-activity" onclick="window.location.href='index.html?tab=activity'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <span>Activity</span>
+    </button>
+    <button class="bnav-item" id="bnav-account" onclick="window.location.href='index.html?tab=account'">
+      <div class="bnav-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <span>Account</span>
+    </button>
+  </nav>
+
+  <script src="app.js"></script>
+  <script>
+    // Populate user from session
+    const _u = JSON.parse(sessionStorage.getItem('airide_user') || '{}');
+    if (_u.name) {
+      const fn = _u.name.split(' ')[0];
+      document.getElementById('user-name-nav').textContent = fn;
+      document.getElementById('user-avatar').textContent = fn[0].toUpperCase();
+    }
+
+    function doLogout() {
+      sessionStorage.removeItem('airide_user');
+      window.location.href = 'auth.html';
+    }
+    document.getElementById('btn-logout').addEventListener('click', doLogout);
+
+    // Set default departure time to now + 2 hours
+    (function() {
+      const timeInp = document.getElementById('sched-time');
+      if (timeInp) {
+        const now = new Date();
+        now.setHours(now.getHours() + 2);
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        timeInp.value = now.toISOString().slice(0, 16);
+      }
+    })();
+
+    // ── Schedule Ride Features ──
+    window.toggleSchedCourierFields = function() {
+      const category = document.getElementById('sched-category').value;
+      const courierRow = document.getElementById('sched-courier-row');
+      if (category === 'courier') {
+        courierRow.style.display = 'flex';
+      } else {
+        courierRow.style.display = 'none';
+      }
+    };
+
+    window.loadScheduledRides = function() {
+      const listDiv = document.getElementById('scheduled-rides-list');
+      const allRides = JSON.parse(localStorage.getItem('airide_scheduled_rides') || '[]');
+      
+      // Filter rides belonging to the logged in user
+      const userRides = allRides.filter(r => r.userId === _u.id);
+      
+      if (userRides.length === 0) {
+        listDiv.innerHTML = `
+          <div class="rides-empty" style="padding: 30px 10px;">
+            <p>No scheduled rides yet. Fill out the form above to reserve a future route!</p>
+          </div>`;
+        return;
+      }
+      
+      listDiv.innerHTML = userRides.map(r => {
+        const dateStr = new Date(r.departureTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        const typeBadge = r.category === 'courier' 
+          ? `<span style="background: rgba(245, 158, 11, 0.15); color: #FCD34D; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500;">📦 Courier (${r.pkgCategory})</span>`
+          : `<span style="background: rgba(124, 58, 237, 0.15); color: #A78BFA; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500;">🚗 Ride Share</span>`;
+          
+        return `
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--card-border); padding: 16px; border-radius: 14px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              ${typeBadge}
+              <button class="btn-secondary" onclick="cancelScheduledRide('${r.id}')" style="padding: 5px 12px; font-size: 11px; border-color: rgba(239, 68, 68, 0.3); color: #FCA5A5;">Cancel</button>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px;">
+              <div style="font-size: 13px; font-weight: 500; color: #fff;">
+                <span style="color: #6EE7B7;">🟢 From:</span> ${r.origin}
+              </div>
+              <div style="font-size: 13px; font-weight: 500; color: #fff;">
+                <span style="color: #F87171;">🔴 To:</span> ${r.destination}
+              </div>
+              <div style="font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Departure: ${dateStr}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    };
+
+    window.scheduleRideSubmit = function() {
+      const origin = document.getElementById('sched-origin').value.trim();
+      const destination = document.getElementById('sched-dest').value.trim();
+      const departureTime = document.getElementById('sched-time').value;
+      const category = document.getElementById('sched-category').value;
+      
+      if (!origin || !destination || !departureTime) {
+        alert('Please fill out Origin, Destination, and Departure Time.');
+        return;
+      }
+      
+      const newRide = {
+        id: 'SCH-' + Math.floor(Math.random() * 90000 + 10000),
+        userId: _u.id,
+        origin,
+        destination,
+        departureTime,
+        category,
+        pkgWeight: category === 'courier' ? parseFloat(document.getElementById('sched-weight').value) : null,
+        pkgCategory: category === 'courier' ? document.getElementById('sched-pkg-cat').value : null,
+        status: 'scheduled',
+        createdAt: new Date().toISOString()
+      };
+      
+      const allRides = JSON.parse(localStorage.getItem('airide_scheduled_rides') || '[]');
+      allRides.push(newRide);
+      localStorage.setItem('airide_scheduled_rides', JSON.stringify(allRides));
+      
+      document.getElementById('sched-origin').value = '';
+      document.getElementById('sched-dest').value = '';
+      
+      loadScheduledRides();
+      alert(`Journey successfully scheduled! (ID: ${newRide.id})`);
+    };
+
+    window.cancelScheduledRide = function(rideId) {
+      if (!confirm('Are you sure you want to cancel this scheduled journey?')) return;
+      
+      const allRides = JSON.parse(localStorage.getItem('airide_scheduled_rides') || '[]');
+      const filtered = allRides.filter(r => r.id !== rideId);
+      localStorage.setItem('airide_scheduled_rides', JSON.stringify(filtered));
+      
+      loadScheduledRides();
+    };
+
+    // Initialize list
+    loadScheduledRides();
+
+    // Particles background
+    (function() {
+      const c = document.getElementById('particles');
+      for (let i = 0; i < 22; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.cssText = `left:${Math.random()*100}%;width:${Math.random()*2+1}px;height:${Math.random()*2+1}px;animation-duration:${Math.random()*14+8}s;animation-delay:${Math.random()*12}s;opacity:${Math.random()*0.5+0.15};`;
+        c.appendChild(p);
+      }
+    })();
+  </script>
+</body>
+</html>

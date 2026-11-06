@@ -164,7 +164,7 @@ def startup_event():
         print(f"[STARTUP NOTICE] Table initialization error: {e}")
 
 
-@app.get("/", response_model=dict)
+@app.get("/api", response_model=dict)
 def home():
     return {"message": "AI Ride Sharing backend is running", "status": "ok"}
 
@@ -1328,3 +1328,17 @@ def calculate_cost_breakdown_endpoint(req: dict):
     is_parcel = bool(req.get("is_parcel", False))
     actual_fare = float(req.get("actual_fare")) if req.get("actual_fare") is not None else None
     return calculate_cost_savings(distance_m=dist_m, vehicle_type=vehicle, seats=seats, is_parcel=is_parcel, actual_fare=actual_fare)
+
+
+# ── Mount Frontend Static Web Application ─────────────────────────────────────
+from fastapi.staticfiles import StaticFiles
+
+_fe_candidates = [
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "frontend")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
+]
+_frontend_path = next((p for p in _fe_candidates if os.path.isdir(p) and os.path.exists(os.path.join(p, "index.html"))), None)
+
+if _frontend_path:
+    app.mount("/", StaticFiles(directory=_frontend_path, html=True), name="frontend")
+

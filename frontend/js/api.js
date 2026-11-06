@@ -18,6 +18,10 @@ function resolveApiBase() {
   const host = rawHost || '127.0.0.1';
   const isLocal = isFile || host === '127.0.0.1' || host === 'localhost' || host.startsWith('192.168.') || host.startsWith('10.');
 
+  if (isBrowser && window.location.origin && window.location.origin.includes('onrender.com')) {
+    return window.location.origin;
+  }
+
   const meta = document.querySelector('meta[name="airide-api"]')?.content?.trim();
   if (meta && !isLocal) return meta.replace(/\/$/, '');
 

@@ -1139,7 +1139,7 @@ def delete_notification_endpoint(notification_id: int):
         raise HTTPException(status_code=400, detail="Failed to delete notification.")
     return {"success": True}
 
-
+  
 @app.post("/notifications/clear/{user_id}")
 @app.delete("/notifications/clear/{user_id}")
 def clear_notifications_endpoint(user_id: int):

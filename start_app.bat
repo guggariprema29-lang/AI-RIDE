@@ -11,8 +11,10 @@ netstat -ano | findstr :5432 >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo     PostgreSQL is already running on port 5432.
 ) else (
+    echo     Cleaning stale lock if present...
+    if exist "C:\Program Files\PostgreSQL\17\data\postmaster.pid" del /f /q "C:\Program Files\PostgreSQL\17\data\postmaster.pid"
     echo     Starting PostgreSQL 17 server...
-    "C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe" start -D "C:\Program Files\PostgreSQL\17\data" -l "C:\Program Files\PostgreSQL\17\data\server.log"
+    "C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe" start -D "C:\Program Files\PostgreSQL\17\data"
     timeout /t 3 /nobreak >nul
 )
 

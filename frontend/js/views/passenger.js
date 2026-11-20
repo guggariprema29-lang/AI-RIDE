@@ -251,6 +251,25 @@ export default function passengerView(container) {
   let lastSearchParams = null;
   let pollInterval = null;
 
+  async function loadLiveRides() {
+    if (lastSearchParams) {
+      await executeSearch(true);
+      return;
+    }
+    try {
+      const res = await api.liveRides();
+      const rides = res.rides || [];
+      liveLayer.render(rides, { showRoutes: false });
+      if (countNode) {
+        countNode.textContent = `${rides.length} live driver${rides.length === 1 ? '' : 's'}`;
+      }
+    } catch { /* ignore network blips */ }
+  }
+
+  // Load live drivers dynamically from DB immediately on portal mount
+  loadLiveRides();
+  pollInterval = setInterval(loadLiveRides, 4000);
+
   async function executeSearch(isSilent = false) {
     if (!lastSearchParams) return;
     if (!isSilent) {
@@ -304,12 +323,6 @@ export default function passengerView(container) {
       await executeSearch(false);
     } finally {
       setBusy(button, false);
-    }
-
-    if (!pollInterval) {
-      pollInterval = setInterval(() => {
-        executeSearch(true);
-      }, 4000);
     }
   });
 

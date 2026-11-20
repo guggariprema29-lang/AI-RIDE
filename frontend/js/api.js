@@ -128,6 +128,12 @@ export const api = {
     request(`/rides/${id}/location`, { method: 'POST', body: { latitude, longitude } }),
   updateRideStatus: (id, status) =>
     request(`/rides/${id}/status`, { method: 'POST', body: { status } }),
+  setDriverAvailability: (userId, isAvailable, coords = {}) =>
+    request(`/riders/${userId}/availability`, { method: 'POST', body: { is_available: isAvailable, ...coords } }),
+  getDriverAvailability: (userId) =>
+    request(`/riders/${userId}/availability`),
+  availableDrivers: (signal) =>
+    request('/riders/available', { signal }),
 
   searchRides: (payload, signal) => request('/rides/search', { method: 'POST', body: payload, signal }),
 

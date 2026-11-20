@@ -31,6 +31,7 @@ else:
     print("[Twilio] Not configured — running in demo mode (OTP shown on screen)")
 
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -52,7 +53,7 @@ from schemas import (
     RidePublishRequest, RideLocationUpdate, RideStatusUpdate, RideSearchRequest,
     BookingCreate, RelayBookingCreate, BookingStatusUpdate, BookingStartRequest, BookingRateRequest,
     ParcelCreate, ParcelAcceptRequest, ParcelOTPVerify,
-    RecurringScheduleCreate, RecurringSubscribeRequest
+    RecurringScheduleCreate, RecurringSubscribeRequest, DriverAvailabilityRequest
 )
 from recurring import (
     create_recurring_schedule, get_user_recurring_schedules, get_recurring_schedule,
@@ -768,6 +769,79 @@ def set_ride_status(ride_id: int, req: RideStatusUpdate):
     return ride
 
 
+# ── Driver / Rider Availability Management ────────────────────────────────
+
+@app.post("/riders/{user_id}/availability")
+def set_driver_availability(user_id: int, req: DriverAvailabilityRequest):
+    """Toggle driver online/offline availability and update live position."""
+    user = get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            updates = ["is_available = %s"]
+            vals = [req.is_available]
+            if req.current_lat is not None:
+                updates.append("current_lat = %s")
+                vals.append(req.current_lat)
+            if req.current_lng is not None:
+                updates.append("current_lng = %s")
+                vals.append(req.current_lng)
+            if req.current_location is not None:
+                updates.append("current_location = %s")
+                vals.append(req.current_location)
+            vals.append(user_id)
+            cur.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = %s", tuple(vals))
+            
+            # Keep rides table in sync:
+            if not req.is_available:
+                cur.execute("UPDATE rides SET status = 'paused' WHERE rider_id = %s AND status = 'available'", (user_id,))
+            else:
+                cur.execute("UPDATE rides SET status = 'available' WHERE rider_id = %s AND status = 'paused'", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"user_id": user_id, "is_available": req.is_available, "status": "online" if req.is_available else "offline"}
+
+
+@app.get("/riders/{user_id}/availability")
+def get_driver_availability(user_id: int):
+    """Retrieve driver's current availability status and location."""
+    user = get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": user_id,
+        "is_available": bool(user.get("is_available", True)),
+        "current_lat": user.get("current_lat"),
+        "current_lng": user.get("current_lng"),
+        "current_location": user.get("current_location")
+    }
+
+
+@app.get("/riders/available")
+def get_available_drivers():
+    """Returns all active, online drivers/riders from the database dynamically."""
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, name, public_id, phone, email, gender, role, vehicle_type, vehicle_number,
+                       is_available, account_status, current_location, current_lat, current_lng,
+                       trust_score, rating
+                FROM users
+                WHERE (role IN ('driver', 'rider', 'both') OR role IS NULL)
+                  AND COALESCE(is_available, TRUE) = TRUE
+                  AND COALESCE(account_status, 'active') = 'active'
+                ORDER BY id DESC
+            """)
+            drivers = cur.fetchall()
+            return {"drivers": [dict(d) for d in drivers], "count": len(drivers)}
+    finally:
+        conn.close()
+
+
 # ── Passenger portal ───────────────────────────────────────────────────────
 
 @app.post("/rides/search")
@@ -785,7 +859,7 @@ def search_rides(req: RideSearchRequest):
         if req.passenger_id and ride.get("rider_id") == req.passenger_id:
             continue
         is_women_only = bool(ride.get("women_only", False))
-        if is_women_only and passenger_gender != "female":
+        if is_women_only and passenger_gender == "male":
             continue
         if req.women_only_filter and not is_women_only:
             continue

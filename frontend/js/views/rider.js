@@ -35,6 +35,20 @@ export default function riderView(container) {
         <button class="btn btn-ghost" data-refresh>${icon('refresh', 16)} Refresh</button>
       </div>
 
+      <!-- Driver Online/Offline Availability Toggle -->
+      <div class="card" style="margin-bottom:var(--space-4);background:var(--color-surface);border:1px solid var(--color-border);padding:var(--space-3) var(--space-4);display:flex;align-items:center;justify-content:space-between;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)">
+        <div class="row-tight" style="gap:var(--space-3)">
+          <span class="status-indicator" data-driver-status-dot style="width:14px;height:14px;border-radius:50%;background:#10b981;box-shadow:0 0 10px #10b981;display:inline-block"></span>
+          <div>
+            <div style="font-weight:600;font-size:var(--text-base)" data-driver-status-text>Status: Online & Ready for Passengers</div>
+            <div class="xsmall muted" data-driver-status-desc>You are visible to passengers searching along your route corridor.</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" data-toggle-availability style="cursor:pointer;font-weight:600;min-width:130px">
+          🔴 Go Offline
+        </button>
+      </div>
+
       <div class="split">
         <section class="card" data-form-card>
           <div class="card-title">
@@ -216,6 +230,66 @@ export default function riderView(container) {
   locateUser()
     .then(([lat, lng]) => map.setView([lat, lng], 13))
     .catch(() => { /* location denied — default view is fine */ });
+
+  /* ── Driver Availability Switch ────────────────────────────────────────── */
+  let isDriverOnline = true;
+  const statusDot = container.querySelector('[data-driver-status-dot]');
+  const statusText = container.querySelector('[data-driver-status-text]');
+  const statusDesc = container.querySelector('[data-driver-status-desc]');
+  const toggleBtn = container.querySelector('[data-toggle-availability]');
+
+  function updateAvailabilityUI(online) {
+    isDriverOnline = online;
+    if (statusDot) {
+      statusDot.style.background = online ? '#10b981' : '#ef4444';
+      statusDot.style.boxShadow = online ? '0 0 10px #10b981' : 'none';
+    }
+    if (statusText) {
+      statusText.textContent = online ? 'Status: Online & Ready for Passengers' : 'Status: Offline (Hidden from Passengers)';
+    }
+    if (statusDesc) {
+      statusDesc.textContent = online
+        ? 'You are visible to passengers searching along your route corridor.'
+        : 'You are currently offline. Go online so passengers can discover and book your rides.';
+    }
+    if (toggleBtn) {
+      toggleBtn.className = online ? 'btn btn-sm btn-outline' : 'btn btn-sm btn-primary';
+      toggleBtn.innerHTML = online ? '🔴 Go Offline' : '🟢 Go Online';
+    }
+  }
+
+  if (user?.id) {
+    api.getDriverAvailability(user.id)
+      .then((res) => {
+        updateAvailabilityUI(Boolean(res.is_available));
+      })
+      .catch(() => updateAvailabilityUI(true));
+
+    toggleBtn?.addEventListener('click', async () => {
+      const targetState = !isDriverOnline;
+      setBusy(toggleBtn, true, 'Updating…');
+      try {
+        let lat = null, lng = null;
+        try {
+          const coords = await locateUser();
+          lat = coords[0];
+          lng = coords[1];
+        } catch { /* GPS fallback */ }
+
+        await api.setDriverAvailability(user.id, targetState, {
+          current_lat: lat,
+          current_lng: lng
+        });
+        updateAvailabilityUI(targetState);
+        toast(targetState ? 'You are now Online! Passengers can discover your rides.' : 'You are now Offline. Rides paused.', 'success');
+        refresh();
+      } catch (err) {
+        toast(err.message || 'Failed to update availability status', 'error');
+      } finally {
+        setBusy(toggleBtn, false);
+      }
+    });
+  }
 
   /* ── Vehicle selector ──────────────────────────────────────────────────── */
 

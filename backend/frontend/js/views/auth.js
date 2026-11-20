@@ -155,6 +155,31 @@ export function signupView(container, query) {
         <span class="helper">Required to access or publish Women-Only rides and parcels.</span>
       </div>
 
+      <div class="field">
+        <label for="su-role">Account Role</label>
+        <select id="su-role" class="input">
+          <option value="both" selected>Both Rider/Driver & Passenger</option>
+          <option value="driver">Rider / Driver (Publish trips & offer rides)</option>
+          <option value="passenger">Passenger (Search & book rides)</option>
+        </select>
+        <span class="helper">Choose your primary role. You can switch between portals anytime.</span>
+      </div>
+
+      <div id="su-vehicle-box" style="background:var(--color-surface-dim);padding:var(--space-3);border-radius:var(--radius-md);margin-bottom:var(--space-3);border:1px dashed var(--color-border)">
+        <div class="field">
+          <label for="su-vehicle-type">Vehicle Type</label>
+          <select id="su-vehicle-type" class="input">
+            <option value="car">Car (5-Seater)</option>
+            <option value="bike">Bike (2-Seater)</option>
+            <option value="auto">Auto (4-Seater)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="su-vehicle-num">Vehicle Plate Number <span class="muted">(optional)</span></label>
+          <input id="su-vehicle-num" type="text" placeholder="KA 22 AB 1234">
+        </div>
+      </div>
+
       <div class="card card-tight" style="background:var(--color-muted);margin-bottom:var(--space-4)">
         <div class="row-tight" style="justify-content:space-between">
           <span class="small"><strong>Verify phone</strong> <span class="muted">(optional)</span></span>
@@ -192,6 +217,14 @@ export function signupView(container, query) {
   let phoneVerified = false;
   const otpBox = container.querySelector('[data-otp-box]');
   const otpHint = container.querySelector('[data-otp-hint]');
+  const roleSelect = form.querySelector('#su-role');
+  const vehicleBox = form.querySelector('#su-vehicle-box');
+
+  if (roleSelect && vehicleBox) {
+    roleSelect.addEventListener('change', () => {
+      vehicleBox.style.display = roleSelect.value === 'passenger' ? 'none' : 'block';
+    });
+  }
 
   container.querySelector('[data-otp-send]').addEventListener('click', async (event) => {
     const phone = fields.phone.value.trim();
@@ -257,6 +290,10 @@ export function signupView(container, query) {
     const button = form.querySelector('button[type="submit"]');
     setBusy(button, true, 'Creating account…');
     try {
+      const roleVal = (form.querySelector('#su-role')?.value || 'both');
+      const vtype = form.querySelector('#su-vehicle-type')?.value || 'car';
+      const vnum = form.querySelector('#su-vehicle-num')?.value?.trim() || null;
+
       const user = await api.register({
         name: fields.name.value.trim(),
         email: fields.email.value.trim(),
@@ -264,6 +301,11 @@ export function signupView(container, query) {
         government_id: fields.gov.value.trim(),
         password: fields.password.value,
         gender: form.querySelector('#su-gender').value,
+        role: roleVal,
+        vehicle_type: vtype,
+        vehicle_number: vnum,
+        is_available: true,
+        account_status: 'active',
         face_verified: phoneVerified,
       });
       afterAuth(user, query.next);

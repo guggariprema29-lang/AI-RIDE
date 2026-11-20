@@ -201,7 +201,10 @@ def _rows_with_rider(where: str, params: tuple, limit: Optional[int] = None) -> 
                    u.rating AS rider_rating,
                    u.face_verified AS rider_verified,
                    u.phone AS rider_phone,
-                   u.gender AS rider_gender
+                   u.gender AS rider_gender,
+                   COALESCE(u.role, 'rider') AS rider_role,
+                   COALESCE(u.is_available, TRUE) AS rider_is_available,
+                   COALESCE(u.account_status, 'active') AS rider_account_status
             FROM rides r
             JOIN users u ON u.id = r.rider_id
             {where}
@@ -217,7 +220,7 @@ def _rows_with_rider(where: str, params: tuple, limit: Optional[int] = None) -> 
 
 def get_live_rides(limit: int = 200) -> list[dict]:
     return _rows_with_rider(
-        "WHERE r.status IN ('available', 'started')",
+        "WHERE r.status IN ('available', 'started') AND COALESCE(u.is_available, TRUE) = TRUE",
         (),
         limit,
     )

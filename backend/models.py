@@ -116,6 +116,14 @@ def create_tables():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT 'unspecified';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'both';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_type TEXT DEFAULT 'car';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_number TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT TRUE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status TEXT DEFAULT 'active';",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS current_location TEXT;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS current_lat REAL;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS current_lng REAL;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_bookings INTEGER DEFAULT 0;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_cancellations INTEGER DEFAULT 0;",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS late_cancellations INTEGER DEFAULT 0;",
@@ -212,9 +220,10 @@ def create_user(user_data: dict) -> dict:
                     name, email, government_id, face_verified, rating,
                     delivery_success_rate, cancellation_count, trust_score,
                     password_hash, dob, title, phone, completed_deliveries,
-                    route_deviation_count, report_count, response_time_minutes, gender
+                    route_deviation_count, report_count, response_time_minutes, gender,
+                    role, vehicle_type, vehicle_number, is_available, account_status, current_location
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (government_id) DO UPDATE
                     SET name                  = EXCLUDED.name,
                         email                 = EXCLUDED.email,
@@ -231,7 +240,13 @@ def create_user(user_data: dict) -> dict:
                         route_deviation_count = EXCLUDED.route_deviation_count,
                         report_count          = EXCLUDED.report_count,
                         response_time_minutes = EXCLUDED.response_time_minutes,
-                        gender                = COALESCE(EXCLUDED.gender, users.gender)
+                        gender                = COALESCE(EXCLUDED.gender, users.gender),
+                        role                  = COALESCE(EXCLUDED.role, users.role),
+                        vehicle_type          = COALESCE(EXCLUDED.vehicle_type, users.vehicle_type),
+                        vehicle_number        = COALESCE(EXCLUDED.vehicle_number, users.vehicle_number),
+                        is_available          = COALESCE(EXCLUDED.is_available, users.is_available),
+                        account_status        = COALESCE(EXCLUDED.account_status, users.account_status),
+                        current_location      = COALESCE(EXCLUDED.current_location, users.current_location)
                 RETURNING *;
                 """,
                 (
@@ -252,6 +267,12 @@ def create_user(user_data: dict) -> dict:
                     user_data.get("report_count", 0),
                     user_data.get("response_time_minutes", 10.0),
                     user_data.get("gender", "unspecified"),
+                    user_data.get("role", "both"),
+                    user_data.get("vehicle_type", "car"),
+                    user_data.get("vehicle_number"),
+                    user_data.get("is_available", True),
+                    user_data.get("account_status", "active"),
+                    user_data.get("current_location"),
                 ),
             )
             user = cursor.fetchone()

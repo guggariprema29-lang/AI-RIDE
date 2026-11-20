@@ -24,6 +24,12 @@ class UserCreate(BaseModel):
     gender: Optional[str] = "unspecified"
     wallet_balance: float = 0.0
     escrow_balance: float = 0.0
+    role: Optional[str] = "both"
+    vehicle_type: Optional[str] = "car"
+    vehicle_number: Optional[str] = None
+    is_available: bool = True
+    account_status: str = "active"
+    current_location: Optional[str] = None
 
     @field_validator("phone")
     def validate_phone(cls, v):
@@ -339,4 +345,11 @@ class RecurringSubscribeRequest(BaseModel):
     pickup_lng: Optional[float] = None
     drop_lat: Optional[float] = None
     drop_lng: Optional[float] = None
+
+
+class DriverAvailabilityRequest(BaseModel):
+    is_available: bool
+    current_lat: Optional[float] = None
+    current_lng: Optional[float] = None
+    current_location: Optional[str] = None
 

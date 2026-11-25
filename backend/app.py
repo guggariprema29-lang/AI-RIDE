@@ -706,6 +706,33 @@ def push_ride_location(ride_id: int, req: RideLocationUpdate):
             deviation_info["sos_alert"] = sos_res
 
     ride["route_deviation"] = deviation_info
+
+    # Broadcast live GPS update to passengers on active bookings for this ride
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, passenger_id FROM bookings WHERE ride_id = %s AND status IN ('accepted', 'ongoing');",
+                (ride_id,),
+            )
+            active_b = cursor.fetchall()
+        conn.close()
+        for b_id, pax_id in active_b:
+            if pax_id:
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(manager.broadcast_to_user(pax_id, {
+                        "type": "location_update",
+                        "booking_id": b_id,
+                        "ride_id": ride_id,
+                        "latitude": req.latitude,
+                        "longitude": req.longitude,
+                    }))
+                except RuntimeError:
+                    pass
+    except Exception as e:
+        print(f"[WS LOCATION] Non-blocking broadcast error: {e}")
+
     return ride
 
 
@@ -921,7 +948,10 @@ def book_ride(req: BookingCreate):
     data["overlap_score"] = score["overlap_score"]
     data["detour_m"] = score["detour_m"]
 
-    booking = create_booking(data)
+    try:
+        booking = create_booking(data)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not booking:
         raise HTTPException(status_code=400, detail="Not enough seats available on this ride.")
     return get_booking(booking["id"])
@@ -1012,10 +1042,20 @@ def list_rider_bookings(rider_id: int):
 
 
 @app.get("/bookings/{booking_id}")
-def read_booking(booking_id: int):
+def read_booking(booking_id: int, request: Request):
     booking = get_booking(booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+        payload = decode_access_token(token)
+        if payload and payload.get("id") is not None:
+            uid = int(payload["id"])
+            if uid not in (int(booking["passenger_id"]), int(booking["rider_id"])):
+                raise HTTPException(status_code=403, detail="You do not have permission to view this booking.")
+            if uid == int(booking["rider_id"]):
+                booking.pop("otp", None)
     return booking
 
 
@@ -1082,11 +1122,27 @@ def cancel_booking_endpoint(booking_id: int, payload: dict):
 
 
 @app.post("/bookings/{booking_id}/status")
-def set_booking_status(booking_id: int, req: BookingStatusUpdate):
+def set_booking_status(booking_id: int, req: BookingStatusUpdate, request: Request):
     allowed = {"pending", "accepted", "rejected", "cancelled"}
     if req.status not in allowed:
         raise HTTPException(status_code=400, detail=f"Status must be one of {sorted(allowed)}.")
-    booking = update_booking_status(booking_id, req.status)
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+        payload = decode_access_token(token)
+        if payload and payload.get("id") is not None:
+            uid = int(payload["id"])
+            existing = get_booking(booking_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Booking not found.")
+            if req.status in ("accepted", "rejected") and uid != int(existing["rider_id"]):
+                raise HTTPException(status_code=403, detail="Only the ride owner can accept or reject this booking.")
+            if uid not in (int(existing["passenger_id"]), int(existing["rider_id"])):
+                raise HTTPException(status_code=403, detail="Not authorized to update this booking.")
+    try:
+        booking = update_booking_status(booking_id, req.status)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
     return booking

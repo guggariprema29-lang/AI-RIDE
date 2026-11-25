@@ -414,7 +414,7 @@ export default function riderView(container) {
 
   function requestCard(booking) {
     const nudge = {
-      pending: 'Tap to accept or decline',
+      pending: 'Accept or decline below, or tap card to open Live Trip',
       accepted: 'Tap to enter their start code',
       ongoing: 'Trip running — tap to end it',
       completed: 'Waiting for payment',
@@ -422,7 +422,7 @@ export default function riderView(container) {
     }[booking.status];
 
     return `
-      <button class="trip-card" data-trip="${booking.id}">
+      <article class="trip-card" data-trip="${booking.id}" style="cursor:pointer;text-align:left">
         <div class="trip-card-top">
           <span class="avatar">${escapeHtml(initials(booking.passenger_name))}</span>
           <div style="flex:1;min-width:0">
@@ -445,8 +445,17 @@ export default function riderView(container) {
           <span>${icon('wallet', 13)} ₹${Number(booking.fare).toFixed(0)}</span>
           <span>${icon('navigation', 13)} ${km(booking.detour_m || 0)} detour</span>
         </div>
-        ${nudge ? `<span class="trip-nudge">${icon('arrowRight', 14)} ${nudge}</span>` : ''}
-      </button>
+        ${booking.status === 'pending' ? `
+          <div class="row-tight" style="margin-top:var(--space-3);gap:var(--space-2)">
+            <button type="button" class="btn btn-sm btn-primary" data-accept-booking="${booking.id}" style="flex:1">
+              ${icon('check', 14)} Accept
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" data-reject-booking="${booking.id}" style="flex:1">
+              ${icon('x', 14)} Reject
+            </button>
+          </div>
+        ` : (nudge ? `<span class="trip-nudge">${icon('arrowRight', 14)} ${nudge}</span>` : '')}
+      </article>
     `;
   }
 
@@ -509,8 +518,43 @@ export default function riderView(container) {
       });
     });
 
-    container.querySelectorAll('[data-trip]').forEach((button) => {
-      button.addEventListener('click', () => navigate(`/trip?id=${button.dataset.trip}`));
+    container.querySelectorAll('[data-accept-booking]').forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const id = Number(button.dataset.acceptBooking);
+        setBusy(button, true, 'Accepting…');
+        try {
+          await api.updateBookingStatus(id, 'accepted');
+          toast('Booking accepted! Open the trip to enter the start code.', 'success');
+          refresh();
+        } catch (error) {
+          toast(error.message || 'Could not accept booking', 'error');
+          setBusy(button, false);
+        }
+      });
+    });
+
+    container.querySelectorAll('[data-reject-booking]').forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const id = Number(button.dataset.rejectBooking);
+        setBusy(button, true, 'Declining…');
+        try {
+          await api.updateBookingStatus(id, 'rejected');
+          toast('Booking declined and seat released.', 'info');
+          refresh();
+        } catch (error) {
+          toast(error.message || 'Could not reject booking', 'error');
+          setBusy(button, false);
+        }
+      });
+    });
+
+    container.querySelectorAll('[data-trip]').forEach((card) => {
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('[data-accept-booking]') || event.target.closest('[data-reject-booking]')) return;
+        navigate(`/trip?id=${card.dataset.trip}`);
+      });
     });
 
     container.querySelectorAll('[data-view-rider-receipt]').forEach((button) => {
@@ -633,7 +677,7 @@ export default function riderView(container) {
   });
 
   refresh();
-  refreshTimer = setInterval(refresh, 20000);
+  refreshTimer = setInterval(refresh, 5000);
 
   return {
     destroy() {

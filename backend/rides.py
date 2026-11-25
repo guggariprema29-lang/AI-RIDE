@@ -312,6 +312,21 @@ def create_booking(data: dict) -> Optional[dict]:
             current_booked = int(ride.get("booked_seats") or 0)
             avail = max(0, total_seats - current_booked)
 
+            # Prevent duplicate active bookings by the same passenger on the same ride
+            cursor.execute(
+                """
+                SELECT id, status FROM bookings
+                WHERE ride_id = %s AND passenger_id = %s
+                  AND status IN ('pending', 'accepted', 'ongoing')
+                LIMIT 1;
+                """,
+                (data["ride_id"], data["passenger_id"]),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                conn.rollback()
+                raise ValueError(f"You already have an active booking (#{existing['id']}) for this ride.")
+
             if avail < requested_seats:
                 conn.rollback()
                 return None
@@ -366,12 +381,33 @@ def create_booking(data: dict) -> Optional[dict]:
                 (data["passenger_id"],),
             )
         conn.commit()
-        return dict(booking)
+        created = dict(booking)
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+
+    # Notify rider of new incoming booking request
+    try:
+        full_booking = get_booking(created["id"])
+        if full_booking and full_booking.get("rider_id"):
+            from notifications import create_notification
+            pax_name = full_booking.get("passenger_name", "A passenger")
+            pickup = full_booking.get("pickup", "pickup")
+            dropoff = full_booking.get("dropoff", "destination")
+            create_notification(
+                user_id=full_booking["rider_id"],
+                event_type="booking_created",
+                title="New Seat Request!",
+                message=f"{pax_name} requested {requested_seats} seat(s) from {pickup} to {dropoff}.",
+                booking_id=created["id"],
+                ride_id=created["ride_id"],
+            )
+    except Exception as e:
+        print(f"[BOOKING NOTICE] Non-blocking notification error: {e}")
+
+    return created
 
 
 BOOKING_JOIN = """
@@ -379,6 +415,10 @@ BOOKING_JOIN = """
            r.rider_id AS rider_id,
            r.origin AS ride_origin,
            r.destination AS ride_destination,
+           r.origin_lat AS ride_origin_lat,
+           r.origin_lng AS ride_origin_lng,
+           r.dest_lat AS ride_dest_lat,
+           r.dest_lng AS ride_dest_lng,
            r.departure_time AS ride_departure_time,
            r.vehicle_type,
            r.vehicle_number,
@@ -486,7 +526,21 @@ def complete_booking(booking_id: int) -> tuple[Optional[dict], str]:
         conn.commit()
     finally:
         conn.close()
-    return get_booking(booking_id), ""
+    updated = get_booking(booking_id)
+    if updated and updated.get("passenger_id"):
+        try:
+            from notifications import create_notification
+            create_notification(
+                user_id=updated["passenger_id"],
+                event_type="ride_completed",
+                title="Dropped Off — Payment Due",
+                message=f"You arrived at {updated.get('dropoff', 'your destination')}. Please pay ₹{float(updated.get('fare') or 0):.0f} to complete your trip.",
+                booking_id=booking_id,
+                ride_id=updated.get("ride_id"),
+            )
+        except Exception as e:
+            print(f"[BOOKING NOTICE] Non-blocking notification error: {e}")
+    return updated, ""
 
 
 def pay_booking(booking_id: int) -> tuple[Optional[dict], str]:
@@ -553,7 +607,21 @@ def pay_booking(booking_id: int) -> tuple[Optional[dict], str]:
     except Exception as e:
         print(f"[REVENUE NOTICE] Non-blocking revenue log error: {e}")
 
-    return get_booking(booking_id), ""
+    updated = get_booking(booking_id)
+    if updated and updated.get("rider_id"):
+        try:
+            from notifications import create_notification
+            create_notification(
+                user_id=updated["rider_id"],
+                event_type="payment_received",
+                title="Payment Received!",
+                message=f"{updated.get('passenger_name', 'Passenger')} paid ₹{rider_payout:.0f} (net payout) for booking #{booking_id}.",
+                booking_id=booking_id,
+                ride_id=updated.get("ride_id"),
+            )
+        except Exception as e:
+            print(f"[BOOKING NOTICE] Non-blocking notification error: {e}")
+    return updated, ""
 
 
 def rate_booking(booking_id: int, rater: str, rating: float, review: Optional[str]) -> tuple[Optional[dict], str]:
@@ -661,6 +729,18 @@ def get_user_reviews(user_id: int, limit: int = 20) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+VALID_BOOKING_TRANSITIONS = {
+    "pending": {"accepted", "rejected", "cancelled"},
+    "accepted": {"ongoing", "cancelled"},
+    "ongoing": {"completed"},
+    "completed": {"paid"},
+    "paid": {"closed"},
+    "rejected": set(),
+    "cancelled": set(),
+    "closed": set(),
+}
+
+
 def update_booking_status(booking_id: int, status: str, cancelled_by: str = "passenger", reason: str = "Cancelled by user") -> Optional[dict]:
     """Cancelling or rejecting a booking returns seats to the ride and refunds escrow."""
     if status == "cancelled":
@@ -668,6 +748,8 @@ def update_booking_status(booking_id: int, status: str, cancelled_by: str = "pas
         b = get_booking(booking_id)
         if not b:
             return None
+        if b["status"] not in ("pending", "accepted"):
+            raise ValueError(f"Booking #{booking_id} is '{b['status']}' and cannot be cancelled.")
         pax_id = b.get("passenger_id") or 1
         execute_cancellation(booking_id, pax_id, reason=reason, cancelled_by=cancelled_by)
         return get_booking(booking_id)
@@ -676,7 +758,13 @@ def update_booking_status(booking_id: int, status: str, cancelled_by: str = "pas
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
-                "SELECT ride_id, passenger_id, seats, fare, status FROM bookings WHERE id = %s FOR UPDATE;",
+                """
+                SELECT b.ride_id, b.passenger_id, b.seats, b.fare, b.status, r.status AS ride_status
+                FROM bookings b
+                JOIN rides r ON r.id = b.ride_id
+                WHERE b.id = %s
+                FOR UPDATE OF b;
+                """,
                 (booking_id,),
             )
             booking = cursor.fetchone()
@@ -684,8 +772,20 @@ def update_booking_status(booking_id: int, status: str, cancelled_by: str = "pas
                 conn.rollback()
                 return None
 
+            current_status = booking["status"]
+            allowed_next = VALID_BOOKING_TRANSITIONS.get(current_status, set())
+            if status not in allowed_next:
+                conn.rollback()
+                raise ValueError(
+                    f"Invalid status transition: booking #{booking_id} is already '{current_status}' and cannot move to '{status}'."
+                )
+
+            if status == "accepted" and booking.get("ride_status") not in ("available", "started"):
+                conn.rollback()
+                raise ValueError("This ride is no longer active and cannot accept bookings.")
+
             releasing = status in ("cancelled", "rejected")
-            already_released = booking["status"] in ("cancelled", "rejected")
+            already_released = current_status in ("cancelled", "rejected")
 
             cursor.execute(
                 "UPDATE bookings SET status = %s, updated_at = NOW() WHERE id = %s;",

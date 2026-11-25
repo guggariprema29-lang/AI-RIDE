@@ -90,7 +90,7 @@ export default function tripView(container, query) {
   const bodyNode = container.querySelector('[data-body]');
   const etaNode = container.querySelector('[data-eta]');
 
-  const isRider = () => booking && booking.rider_id === user.id;
+  const isRider = () => booking && Number(booking.rider_id) === Number(user.id);
 
   /** Straight-line pickup→drop, in metres — the booking row stores no distance. */
   function legDistance() {
@@ -259,9 +259,12 @@ export default function tripView(container, query) {
                      class="otp-input" placeholder="0000" required>
               <span class="helper">The passenger can read it from their screen.</span>
             </div>
-            <button class="btn btn-primary btn-block btn-lg" type="submit">
-              ${icon('navigation', 18)} Start ride
-            </button>
+            <div class="trip-actions">
+              <button class="btn" type="button" data-locate>${icon('crosshair', 16)} Share live GPS</button>
+              <button class="btn btn-primary btn-lg" type="submit">
+                ${icon('navigation', 18)} Start ride
+              </button>
+            </div>
           </form>
         `;
       }
@@ -350,7 +353,7 @@ export default function tripView(container, query) {
 
   function render() {
     renderRail();
-    const dev = rideData?.route_deviation;
+    const dev = booking?.route_deviation;
     const deviationBanner = dev && dev.is_deviated ? `
       <div class="${dev.is_critical ? 'off-route-banner-critical' : 'off-route-banner-warning'}" style="margin-bottom:var(--space-4)">
         ${escapeHtml(dev.message || `⚠️ Vehicle off-route by ${dev.deviation_distance_m}m`)}
@@ -665,41 +668,101 @@ export default function tripView(container, query) {
   async function refresh(redraw = true) {
     try {
       const fresh = await api.booking(bookingId);
+      if (Number(fresh.passenger_id) !== Number(user.id) && Number(fresh.rider_id) !== Number(user.id)) {
+        if (timer) { clearInterval(timer); timer = null; }
+        bodyNode.innerHTML = `
+          <div class="card" style="max-width:480px;margin:var(--space-6) auto;text-align:center;padding:var(--space-5)">
+            <div style="font-size:36px;margin-bottom:var(--space-2)">🔒</div>
+            <h3 style="margin-bottom:var(--space-2)">Access Denied</h3>
+            <p class="small muted" style="margin-bottom:var(--space-4)">
+              This booking (#${escapeHtml(String(bookingId))}) does not belong to your account.
+            </p>
+            <button class="btn btn-primary" data-go="/bookings">${icon('ticket', 16)} My Trips</button>
+          </div>
+        `;
+        bodyNode.querySelector('[data-go]')?.addEventListener('click', (e) => {
+          navigate(e.currentTarget.dataset.go);
+        });
+        return;
+      }
+
       const changed = !booking || booking.status !== fresh.status;
       booking = fresh;
       if (redraw || changed) {
         tripMap.draw(booking);
-      } else {
-        tripMap.moveVehicle(Number(booking.current_lat), Number(booking.current_lng));
+      } else if (booking.current_lat != null && booking.current_lng != null) {
+        tripMap.moveVehicle(Number(booking.current_lat), Number(booking.current_lng), booking);
       }
       render();
     } catch (error) {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
+      console.error('[LiveTrip] refresh error:', error);
+      const isNotFound = error?.status === 404;
+      const isForbidden = error?.status === 403;
+      if (isNotFound || isForbidden) {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+        bodyNode.innerHTML = `
+          <div class="card" style="max-width:480px;margin:var(--space-6) auto;text-align:center;padding:var(--space-5)">
+            <div style="font-size:36px;margin-bottom:var(--space-2)">${isForbidden ? '🔒' : '🎫'}</div>
+            <h3 style="margin-bottom:var(--space-2)">${isForbidden ? 'Access Denied' : 'Trip Not Found'}</h3>
+            <p class="small muted" style="margin-bottom:var(--space-4)">
+              ${isForbidden
+                ? `This booking (#${escapeHtml(String(bookingId))}) does not belong to your account.`
+                : `No active booking found for ID #${escapeHtml(String(bookingId))}. It may have been closed or cancelled.`}
+            </p>
+            <button class="btn btn-primary" data-go="/passenger">${icon('search', 16)} Find Rides</button>
+          </div>
+        `;
+        bodyNode.querySelector('[data-go]')?.addEventListener('click', (e) => {
+          navigate(e.currentTarget.dataset.go);
+        });
+      } else {
+        bodyNode.innerHTML = `
+          <div class="card" style="max-width:480px;margin:var(--space-6) auto;text-align:center;padding:var(--space-5)">
+            <div style="font-size:36px;margin-bottom:var(--space-2)">⚠️</div>
+            <h3 style="margin-bottom:var(--space-2)">Could not load trip</h3>
+            <p class="small muted" style="margin-bottom:var(--space-4)">
+              ${escapeHtml(error?.message || 'Unexpected error while loading trip details.')}
+            </p>
+            <button class="btn btn-primary" data-retry>${icon('refresh', 16)} Retry</button>
+          </div>
+        `;
+        bodyNode.querySelector('[data-retry]')?.addEventListener('click', () => refresh(true));
       }
-      bodyNode.innerHTML = `
-        <div class="card" style="max-width:480px;margin:var(--space-6) auto;text-align:center;padding:var(--space-5)">
-          <div style="font-size:36px;margin-bottom:var(--space-2)">🎫</div>
-          <h3 style="margin-bottom:var(--space-2)">Trip Not Found</h3>
-          <p class="small muted" style="margin-bottom:var(--space-4)">
-            No active booking found for ID #${escapeHtml(String(bookingId))}. It may have been closed or cancelled.
-          </p>
-          <button class="btn btn-primary" data-go="/passenger">${icon('search', 16)} Find Rides</button>
-        </div>
-      `;
-      bodyNode.querySelector('[data-go]')?.addEventListener('click', (e) => {
-        navigate(e.currentTarget.dataset.go);
-      });
     }
   }
 
+  let tripWs = null;
+  try {
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + `/ws/${user.id}`;
+    tripWs = new WebSocket(wsUrl);
+    tripWs.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (Number(data.booking_id) === Number(bookingId)) {
+          if (data.type === 'location_update' && booking) {
+            booking.current_lat = data.latitude;
+            booking.current_lng = data.longitude;
+            tripMap.moveVehicle(Number(data.latitude), Number(data.longitude), booking);
+          } else {
+            refresh(false);
+          }
+        }
+      } catch { /* ignore malformed ws frame */ }
+    };
+  } catch { /* fallback to polling */ }
+
   refresh();
-  timer = setInterval(() => refresh(false), 8000);
+  timer = setInterval(() => refresh(false), 4000);
 
   return {
     destroy() {
       closeLiveChatModal();
+      if (tripWs) {
+        try { tripWs.close(); } catch {}
+      }
       clearInterval(timer);
       tripMap.destroy();
       map.remove();

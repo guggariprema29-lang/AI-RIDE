@@ -244,8 +244,8 @@ export class TripMap {
       .bindPopup(`<h4>Drop</h4><div class="small">${escapeHtml(booking.dropoff)}</div>`)
       .addTo(this.group);
 
-    const lat = Number(booking.current_lat);
-    const lng = Number(booking.current_lng);
+    const lat = booking.current_lat != null ? Number(booking.current_lat) : NaN;
+    const lng = booking.current_lng != null ? Number(booking.current_lng) : NaN;
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
       this.vehicle = L.marker([lat, lng], {
         icon: vehicleDivIcon(booking.vehicle_type, booking.status === 'ongoing'),
@@ -258,9 +258,17 @@ export class TripMap {
     this.map.fitBounds(bounds.pad(0.35), { maxZoom: 15 });
   }
 
-  moveVehicle(lat, lng) {
+  moveVehicle(lat, lng, booking = null) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    if (this.vehicle) this.vehicle.setLatLng([lat, lng]);
+    if (this.vehicle) {
+      this.vehicle.setLatLng([lat, lng]);
+    } else if (booking) {
+      this.vehicle = L.marker([lat, lng], {
+        icon: vehicleDivIcon(booking.vehicle_type, booking.status === 'ongoing'),
+        zIndexOffset: 1000,
+        title: booking.rider_name,
+      }).addTo(this.group);
+    }
   }
 
   destroy() {

@@ -96,7 +96,7 @@ export function bookingsView(container) {
   }
 
   refresh();
-  timer = setInterval(refresh, 20000);
+  timer = setInterval(refresh, 5000);
 
   return { destroy() { clearInterval(timer); } };
 }

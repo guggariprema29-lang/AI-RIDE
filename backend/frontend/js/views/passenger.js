@@ -250,10 +250,11 @@ export default function passengerView(container) {
   const resultsNode = container.querySelector('[data-results]');
   let lastSearchParams = null;
   let pollInterval = null;
+  let isBooking = false;
 
   async function loadLiveRides() {
     if (lastSearchParams) {
-      await executeSearch(true);
+      if (!isBooking) await executeSearch(true);
       return;
     }
     try {
@@ -516,11 +517,18 @@ export default function passengerView(container) {
   }
 
   async function bookRelayRide(relayMatch, button, seats) {
-    const paxId = Number(user?.id || store.user?.id || 1);
+    if (isBooking) return;
+    const paxId = Number(user?.id || store.user?.id);
+    if (!paxId) {
+      toast('Please sign in to book a ride.', 'error');
+      navigate('/login');
+      return;
+    }
     const pickupObj = extractLocationDetails(pickupField.value, 'Pickup', 16.43, 74.59);
     const dropObj = extractLocationDetails(dropField.value, 'Dropoff', 15.87, 74.50);
     const maxDetour = Number(container.querySelector('#pax-detour').value) || 5000;
 
+    isBooking = true;
     setBusy(button, true, 'Booking 2 Legs…');
     try {
       const created = await api.bookRelay({
@@ -544,20 +552,29 @@ export default function passengerView(container) {
     } catch (error) {
       toast(error.message, 'error');
       setBusy(button, false);
+    } finally {
+      isBooking = false;
     }
   }
 
   async function book(rideId, button, seats) {
+    if (isBooking) return;
     const targetMatch = matches.find((m) => String(m.id) === String(rideId));
     if (targetMatch && targetMatch.is_relay) {
       return bookRelayRide(targetMatch, button, seats);
     }
 
-    const paxId = Number(user?.id || store.user?.id || 1);
+    const paxId = Number(user?.id || store.user?.id);
+    if (!paxId) {
+      toast('Please sign in to book a ride.', 'error');
+      navigate('/login');
+      return;
+    }
     const pickupObj = extractLocationDetails(pickupField.value, 'Pickup', 16.43, 74.59);
     const dropObj = extractLocationDetails(dropField.value, 'Dropoff', 15.87, 74.50);
     const maxDetour = Number(container.querySelector('#pax-detour').value) || 5000;
 
+    isBooking = true;
     setBusy(button, true, 'Booking…');
     try {
       const created = await api.book({
@@ -577,6 +594,8 @@ export default function passengerView(container) {
     } catch (error) {
       toast(error.message, 'error');
       setBusy(button, false);
+    } finally {
+      isBooking = false;
     }
   }
 

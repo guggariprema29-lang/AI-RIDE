@@ -407,10 +407,17 @@ export default function tripView(container, query) {
     bodyNode.querySelector('[data-otp-form]')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const input = bodyNode.querySelector('#otp-input');
+      const code = input.value.replace(/\D/g, '').trim();
+      if (code.length !== 4) {
+        toast('Enter the 4-digit start code from the passenger', 'error');
+        input.setAttribute('aria-invalid', 'true');
+        input.focus();
+        return;
+      }
       const button = event.currentTarget.querySelector('button[type="submit"]');
       setBusy(button, true, 'Checking…');
       try {
-        await api.startBooking(booking.id, input.value.trim());
+        await api.startBooking(booking.id, code);
         toast('Code verified — ride started', 'success');
         await refresh();
       } catch (error) {
@@ -693,7 +700,17 @@ export default function tripView(container, query) {
       } else if (booking.current_lat != null && booking.current_lng != null) {
         tripMap.moveVehicle(Number(booking.current_lat), Number(booking.current_lng), booking);
       }
-      render();
+
+      // Do not wipe out the OTP or rating input while the user is typing
+      const activeId = document.activeElement?.id;
+      const otpVal = bodyNode.querySelector('#otp-input')?.value?.trim() || '';
+      const reviewVal = bodyNode.querySelector('#review')?.value?.trim() || '';
+      const isTyping = !redraw && !changed && (
+        activeId === 'otp-input' || activeId === 'review' || otpVal.length > 0 || reviewVal.length > 0
+      );
+      if (!isTyping) {
+        render();
+      }
     } catch (error) {
       console.error('[LiveTrip] refresh error:', error);
       const isNotFound = error?.status === 404;

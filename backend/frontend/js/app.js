@@ -4,15 +4,15 @@ import { icon } from './icons.js';
 import { escapeHtml, initials, showNotificationDrawer, toast } from './ui.js';
 import { api, connectNotificationWS } from './api.js';
 
-import landingView from './views/landing.js';
-import { loginView, signupView } from './views/auth.js';
-import homeView from './views/home.js';
-import riderView from './views/rider.js';
-import passengerView from './views/passenger.js';
-import { bookingsView, myTripsView } from './views/trips.js';
-import tripView from './views/trip.js';
-import profileView from './views/profile.js';
-import parcelView from './views/parcel.js';
+import landingView from './views/landing.js?v=20261125b';
+import { loginView, signupView } from './views/auth.js?v=20261125b';
+import homeView from './views/home.js?v=20261125b';
+import riderView from './views/rider.js?v=20261125b';
+import passengerView from './views/passenger.js?v=20261125b';
+import { bookingsView, myTripsView } from './views/trips.js?v=20261125b';
+import tripView from './views/trip.js?v=20261125b';
+import profileView from './views/profile.js?v=20261125b';
+import parcelView from './views/parcel.js?v=20261125b';
 
 theme.apply();
 
